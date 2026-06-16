@@ -159,8 +159,8 @@ Endpoint fields map straight to source columns: `name`, `number`, `customer_id` 
 
 ### 5.2 Forward search
 1. Agent searches the directory in the softphone → `wazo-dird` lookup profile → source `search(term)`.
-2. Plugin → `GET /search?term=` with bearer, `timeout`. Optional short cache.
-3. `200` → return list. Any error → return `[]` (other dird sources still contribute results).
+2. Plugin: cache key `(search, normalized_term)`. **Hit** → return cached. **Miss** → `GET /search?term=` with bearer, `timeout`.
+3. `200` → positive-cache (`cache_ttl`) and return the list (an empty `results` list is cached under `negative_cache_ttl`). Any error → return `[]`, **do not cache** (other dird sources still contribute results).
 
 ---
 
