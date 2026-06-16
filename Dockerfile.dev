@@ -1,0 +1,40 @@
+# Reproduces the PBX's wazo-dird environment for SPI + packaging tests.
+#
+# Deployed target (confirmed on pbx.local.optimo.group, 2026-06-16):
+#   Debian 12 (bookworm), system python 3.11
+#   wazo-dird 26.05~20260424.200946.fed6531.deb12  (wazo-dev-bookworm channel)
+#
+# We install the current wazo-dird from wazo-dev-bookworm; its source backend
+# SPI (BaseSourcePlugin, make_result_class) is stable across these dev snapshots
+# and was verified to match this plugin's assumptions.
+#
+# linux/amd64 is REQUIRED: the Wazo apt repo only ships amd64 packages, so on an
+# arm64 host (Apple Silicon) this runs under emulation.
+FROM --platform=linux/amd64 debian:bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates gnupg curl python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Wazo apt repo (matches the PBX) + signing key, then install wazo-dird so the
+# source-plugin SPI matches production.
+## wazo-dird's postinst tries to configure a postgres DB + systemd units, which
+## don't exist in a build container, so it exits non-zero. dpkg has already
+## UNPACKED the Python package by then, so we tolerate the configure failure
+## (`|| true`) and instead assert the SPI imports cleanly — that is all the
+## tests need.
+RUN echo "deb [signed-by=/usr/share/keyrings/wazo.gpg] http://mirror.wazo.community/debian/ wazo-dev-bookworm main" \
+        > /etc/apt/sources.list.d/wazo.list \
+    && curl -fsSL https://mirror.wazo.community/wazo_current.key | gpg --dearmor -o /usr/share/keyrings/wazo.gpg \
+    && apt-get update \
+    && (apt-get install -y --no-install-recommends wazo-dird || true) \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -c "from wazo_dird import BaseSourcePlugin, make_result_class; print('wazo_dird SPI import OK')"
+
+WORKDIR /src
+COPY requirements-dev.txt .
+RUN pip3 install --break-system-packages -r requirements-dev.txt
+COPY . .
+RUN pip3 install --break-system-packages -e .
+
+CMD ["pytest", "-v"]
