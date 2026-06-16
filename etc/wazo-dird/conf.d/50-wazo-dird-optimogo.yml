@@ -5,5 +5,10 @@
 # xivo's ChainMap deep-merges conf.d into the defaults, so adding optimogo here
 # keeps every stock backend enabled (verified: csv, ldap, phonebook, wazo, ... all remain).
 enabled_plugins:
+  # the source backend (lookup logic)
   backends:
     optimogo: true
+  # the HTTP view that registers /backends/optimogo/sources CRUD — without it,
+  # creating a source (via the dird API or wazo-ui) returns 404.
+  views:
+    optimogo_backend: true

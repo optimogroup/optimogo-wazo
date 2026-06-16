@@ -21,11 +21,18 @@ Poll progress on the returned `uuid` (`GET /api/plugind/0.2/plugins/<uuid>`), or
 watch `journalctl -u wazo-plugind`.
 
 `wazo/rules install` also drops `etc/wazo-dird/conf.d/50-wazo-dird-optimogo.yml`
-into `/etc/wazo-dird/conf.d/`, which **enables** the backend
-(`enabled_plugins.backends.optimogo: true`). This is required: wazo-dird's
-`GET /0.1/backends` returns only `enabled ∩ installed` backends, so without the
-drop-in the backend is installed but invisible to the API and the wazo-ui menu.
-xivo's config ChainMap deep-merges the drop-in, so the stock backends stay enabled.
+into `/etc/wazo-dird/conf.d/`, which **enables both dird plugins** this package
+provides:
+- `enabled_plugins.backends.optimogo` — the source backend (lookup logic). Without
+  it, `GET /0.1/backends` (which drives the wazo-ui menu) omits optimogo, since it
+  returns only `enabled ∩ installed` backends.
+- `enabled_plugins.views.optimogo_backend` — the HTTP view that registers
+  `/backends/optimogo/sources` CRUD. Without it, **creating a source 404s** (via
+  the dird API *or* wazo-ui).
+
+xivo's config ChainMap deep-merges the drop-in, so the stock backends/views stay
+enabled. (This plugin therefore ships three pieces: a dird **backend**, a dird
+**view**, and a wazo-ui **form**.)
 
 ### Option B — manual install (testing, no plugind)
 On the PBX, from a checkout of this repo:

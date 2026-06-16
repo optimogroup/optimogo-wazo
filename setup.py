@@ -12,9 +12,13 @@ setup(
         'wazo_dird_optimogo.ui': ['templates/dird_source/form/*.html'],
     },
     entry_points={
-        # wazo-dird source backend (server side).
+        # wazo-dird source backend: the lookup logic (server side).
         'wazo_dird.backends': [
             'optimogo = wazo_dird_optimogo.plugin:OptimoGoSourcePlugin',
+        ],
+        # wazo-dird view: the /backends/optimogo/sources CRUD HTTP routes.
+        'wazo_dird.views': [
+            'optimogo_backend = wazo_dird_optimogo.dird_view.plugin:OptimoGoView',
         ],
         # wazo-ui admin form for configuring an optimogo source (web UI side).
         'wazo_ui.plugins': [
