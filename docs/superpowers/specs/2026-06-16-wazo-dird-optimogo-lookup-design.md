@@ -146,14 +146,14 @@ Single — `POST {base}/reverse` body `{"number": "<raw_or_e164>"}`:
 // 200 no match
 { "match": null }
 
-// 200 ambiguous (number shared by >1 customer)
-{ "match": { "id": "customer:123:number:+61399999999", "display_name": "Maybe: Acme Plumbing",
+// 200 ambiguous (number shared by >1 customer) — server returns the RAW name; the plugin renders the prefix
+{ "match": { "id": "customer:123:number:+61399999999", "display_name": "Acme Plumbing",
              "name": "Acme Plumbing", "number": "+61399999999", "customer_id": 123,
              "contact_name": null, "match_state": "ambiguous", "candidate_count": 3 } }
 ```
 Batch — `POST {base}/reverse/batch` body `{"numbers": ["+61...", "+61..."]}` → `{"matches": {"<number>": <match-or-null>, ...}}`. Backs `match_all`.
 
-**Ambiguous handling:** the best candidate is chosen deterministically (default: most-recent activity `updated_at` desc, tie-broken by `customer_id`); `name` is the real customer name and **`display_name` is prefixed with `ambiguous_prefix` (`"Maybe: "`)** so the handset itself signals uncertainty (the device cannot see `match_state`). `match_state`/`candidate_count` remain for logging/observability.
+**Ambiguous handling:** the best candidate is chosen deterministically (default: most-recent activity `updated_at` desc, tie-broken by `customer_id`); the server returns the **raw** `name`/`display_name` plus `match_state="ambiguous"`. The **plugin** (not the server) applies the configurable `ambiguous_prefix` (`"Maybe: "`) to produce the handset label `"Maybe: Acme Plumbing"`, so the device itself signals uncertainty (it cannot see `match_state`) and the prefix stays tunable per-Wazo. `match_state`/`candidate_count` remain for logging/observability.
 
 **Input normalization (server + plugin):** an empty/missing number, `anonymous`/withheld/private caller, or non-dialable token → the plugin **skips the HTTP call** and returns `None` (no point querying). The server normalizes national vs E.164 (reusing `core/utils/phone.py`) and treats unparseable input as no-match. Matching is via the Django ORM (parameterized — no injection surface).
 
