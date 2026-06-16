@@ -20,10 +20,18 @@ Install from a git URL via the plugind API (token from `wazo-auth`):
 Poll progress on the returned `uuid` (`GET /api/plugind/0.2/plugins/<uuid>`), or
 watch `journalctl -u wazo-plugind`.
 
+`wazo/rules install` also drops `etc/wazo-dird/conf.d/50-wazo-dird-optimogo.yml`
+into `/etc/wazo-dird/conf.d/`, which **enables** the backend
+(`enabled_plugins.backends.optimogo: true`). This is required: wazo-dird's
+`GET /0.1/backends` returns only `enabled ∩ installed` backends, so without the
+drop-in the backend is installed but invisible to the API and the wazo-ui menu.
+xivo's config ChainMap deep-merges the drop-in, so the stock backends stay enabled.
+
 ### Option B — manual install (testing, no plugind)
 On the PBX, from a checkout of this repo:
 
     sudo pip3 install --break-system-packages --no-deps .
+    sudo install -m 644 etc/wazo-dird/conf.d/50-wazo-dird-optimogo.yml /etc/wazo-dird/conf.d/
     sudo systemctl restart wazo-dird
 
 ### Post-install health check (and rollback)
@@ -61,6 +69,21 @@ Optional keys (defaults in spec §3.3): `connect_timeout` (0.4), `read_timeout`
 - Confirm the reverse profile's **display** maps `display_name` to the handset
   name field. The handset caller-ID path is resolved pre-ring by the
   `callerid_forphones` AGI querying wazo-dird's reverse service.
+
+## Web admin UI (wazo-ui): menu vs. form
+Once the backend is enabled (above), `optimogo` **appears** in wazo-ui's
+"Add Directory Source" menu, because that menu is `GET /0.1/backends`.
+
+However, wazo-ui **cannot yet render a config form** for it: the per-backend forms
+and templates (`form_<backend>.html`, the `<backend>_config` form field) are
+hardcoded in wazo-ui for the 9 stock backends only — there is no `form_optimogo.html`.
+Clicking "Add → OptimoGo" in the UI will therefore error (TemplateNotFound).
+
+Two ways forward:
+- **Provision via the dird REST API** (works today — §2), or
+- **Add a wazo-ui plugin** that ships an `OptimoGoForm` + `form_optimogo.html`
+  template so the source is fully manageable from the web UI (separate, optional
+  deliverable).
 
 ## 4. Teardown order (uninstall / disconnect)
 1. **Unbind** `optimogo` from all profiles (reverse + lookup) first.

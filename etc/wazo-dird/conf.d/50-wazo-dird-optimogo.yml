@@ -1,0 +1,9 @@
+# Enable the optimogo wazo-dird source backend (shipped by wazo-dird-optimogo).
+#
+# wazo-dird only loads — and only lists in GET /0.1/backends (which populates the
+# wazo-ui "Add Directory Source" menu) — backends present in enabled_plugins.backends.
+# xivo's ChainMap deep-merges conf.d into the defaults, so adding optimogo here
+# keeps every stock backend enabled (verified: csv, ldap, phonebook, wazo, ... all remain).
+enabled_plugins:
+  backends:
+    optimogo: true
