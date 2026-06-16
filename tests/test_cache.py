@@ -1,3 +1,4 @@
+import threading
 from wazo_dird_optimogo.cache import TTLCache
 
 
@@ -38,3 +39,27 @@ def test_lru_eviction(clock):
     assert c.get('b') == (False, None)
     assert c.get('a') == (True, 1)
     assert c.get('c') == (True, 3)
+
+
+def test_concurrent_access_is_thread_safe():
+    # Uses real monotonic clock (no clock fixture) so threads share one cache.
+    c = TTLCache(max_entries=500)
+    errors = []
+
+    def worker(worker_id):
+        try:
+            for i in range(2000):
+                key = f'k{worker_id}-{i % 50}'
+                c.set(key, i, ttl=60)
+                c.get(key)
+        except Exception as e:  # noqa: BLE001 - test must surface ANY thread error
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    assert len(c._data) <= 500   # LRU bound respected under concurrency

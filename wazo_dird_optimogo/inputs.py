@@ -8,7 +8,7 @@ def should_skip_number(raw):
     """True when there is no point querying OptimoGo (empty/anonymous/non-dialable)."""
     if raw is None:
         return True
-    s = raw.strip().lower()
+    s = str(raw).strip().lower()
     if s in _ANON_TOKENS:
         return True
     return not any(c.isdigit() for c in s)
@@ -21,7 +21,7 @@ def normalize_number_key(raw):
     formatting differences so '+61 3...' and '03...' that are equal as typed hit
     one cache entry.
     """
-    s = raw.strip()
+    s = str(raw).strip()
     plus = s.startswith('+')
     digits = ''.join(c for c in s if c.isdigit())
     return ('+' if plus else '') + digits

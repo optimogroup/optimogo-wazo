@@ -67,3 +67,12 @@ def test_malformed_json_is_lookup_error():
                   status=200, content_type='application/json')
     with pytest.raises(OptimoGoLookupError):
         make_client().post('/reverse', {'number': '1'})
+
+
+@responses.activate
+def test_oversized_body_is_lookup_error():
+    big = '{"x":"' + 'a' * (2 * 1024 * 1024) + '"}'   # > 1 MiB
+    responses.add(responses.POST, f'{BASE}/reverse', body=big,
+                  status=200, content_type='application/json')
+    with pytest.raises(OptimoGoLookupError):
+        make_client().post('/reverse', {'number': '1'})

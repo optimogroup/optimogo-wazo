@@ -29,3 +29,9 @@ def test_validate_term_length_bounds():
 
 def test_term_key_normalizes_whitespace_and_case():
     assert normalize_term_key('  Acme   Plumbing ') == 'acme plumbing'
+
+
+def test_non_string_number_does_not_raise():
+    assert should_skip_number(123) is False        # '123' has digits -> dialable
+    assert should_skip_number(0) is False           # '0' has a digit
+    assert normalize_number_key(123) == '123'

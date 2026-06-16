@@ -10,6 +10,8 @@ from .mapping import map_match, map_results
 
 logger = logging.getLogger(__name__)
 
+_FAILED = object()   # sentinel: request failed (distinct from a valid empty body)
+
 
 class LookupEngine:
     """Bounded fail-open lookups: cache -> breaker -> HTTP -> mapping.
@@ -99,6 +101,3 @@ class LookupEngine:
         close = getattr(self._client, 'close', None)
         if close:
             close()
-
-
-_FAILED = object()   # sentinel: request failed (distinct from a valid empty body)
