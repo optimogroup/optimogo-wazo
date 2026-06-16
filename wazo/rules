@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+# wazo-plugind install rules for optimo/wazo-dird-optimogo (plugin_format_version 2).
+#
+# Invoked by the generated debian maintainer scripts (confirmed against
+# wazo-plugind 26.04 templates) as:
+#   rules install     -> postinst   (configure): install the package + reload dird
+#   rules uninstall    -> prerm      (remove):    remove the package + reload dird
+#   rules postrm       -> postrm     (purge/remove): final cleanup
+#
+# wazo-plugind installs the whole plugin tree under
+#   /usr/lib/wazo-plugind/plugins/optimo/wazo-dird-optimogo/
+# so PLUGIN_DIR is the parent of this wazo/ directory (where setup.py lives).
+PLUGIN_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+
+.PHONY: install uninstall postrm
+
+install:
+	pip3 install --break-system-packages --no-deps --upgrade "$(PLUGIN_DIR)"
+	systemctl restart wazo-dird
+
+uninstall:
+	pip3 uninstall --yes wazo-dird-optimogo || true
+	systemctl restart wazo-dird
+
+postrm:
+	true

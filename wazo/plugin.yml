@@ -1,0 +1,12 @@
+name: wazo-dird-optimogo
+namespace: optimo
+version: '1.0.0'
+plugin_format_version: 2
+display_name: OptimoGo dird lookup
+description: >
+  wazo-dird source backend that resolves caller IDs (reverse) and directory
+  searches (forward) against a tenant's OptimoGo JSON endpoint.
+author: Optimo Group
+license: proprietary
+debian_depends:
+  - wazo-dird
