@@ -27,9 +27,10 @@ RUN echo "deb [signed-by=/usr/share/keyrings/wazo.gpg] http://mirror.wazo.commun
         > /etc/apt/sources.list.d/wazo.list \
     && curl -fsSL https://mirror.wazo.community/wazo_current.key | gpg --dearmor -o /usr/share/keyrings/wazo.gpg \
     && apt-get update \
-    && (apt-get install -y --no-install-recommends wazo-dird || true) \
+    && (apt-get install -y --no-install-recommends wazo-dird wazo-ui || true) \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -c "from wazo_dird import BaseSourcePlugin, make_result_class; print('wazo_dird SPI import OK')"
+    && python3 -c "from wazo_dird import BaseSourcePlugin, make_result_class; print('wazo_dird SPI import OK')" \
+    && python3 -c "from wazo_ui.plugins.dird_source.form import DirdSourceForm; print('wazo_ui import OK')"
 
 WORKDIR /src
 COPY requirements-dev.txt .

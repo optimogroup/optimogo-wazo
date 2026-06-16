@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% set backend = 'optimogo' %}
+
+{% if form_mode == 'add' %}
+  {% set url_action = url_for('.DirdSourceView:post') %}
+  {% set submit_value = _('Add') %}
+  {% set breadcrumb = { 'name': _('Add OptimoGo source'), 'icon': 'address-book' } %}
+{% else %}
+  {% set url_action = url_for('.DirdSourceView:put', backend=backend, id=resource.uuid) %}
+  {% set submit_value = _('Edit') %}
+  {% set breadcrumb = { 'name': resource.name, 'link': url_for('.DirdSourceView:get', backend=backend, id=resource.uuid), 'icon': 'address-book' } %}
+{% endif %}
+
+{% block content_header %}
+  {{ build_breadcrumbs(current_breadcrumbs + [breadcrumb]) }}
+{% endblock %}
+
+{% block content %}
+  {% call build_section_row() %}
+    {% call build_form_tabs_box() %}
+      <!-- tabs -->
+      {% call build_tabs_navigation() %}
+        {{ add_tab_navigation_item('optimogo', _('OptimoGo'), active=True) }}
+        {{ add_tab_navigation_item('advanced', _('Advanced')) }}
+      {% endcall %}
+
+      {% call build_form(action=url_action) %}
+        {% call build_tabs_content() %}
+          <!-- OptimoGo -->
+          {% call build_tab_content_item('optimogo', active=True) %}
+            {% call add_default_fields(form=form, submit_value=submit_value) %}
+              {{ render_field(form.backend) }}
+              {{ render_field(form.name) }}
+              {{ render_field(form.optimogo_config.lookup_url) }}
+              {{ render_field(form.optimogo_config.api_key) }}
+            {% endcall %}
+          {% endcall %}
+
+          <!-- Advanced -->
+          {% call build_tab_content_item('advanced') %}
+            {% call add_default_fields(form=form, submit_value=submit_value) %}
+              {{ render_field(form.optimogo_config.connect_timeout) }}
+              {{ render_field(form.optimogo_config.read_timeout) }}
+              {{ render_field(form.optimogo_config.cache_ttl) }}
+              {{ render_field(form.optimogo_config.negative_cache_ttl) }}
+              {{ render_field(form.optimogo_config.cache_max_entries) }}
+              {{ render_field(form.optimogo_config.breaker_failure_threshold) }}
+              {{ render_field(form.optimogo_config.breaker_cooldown) }}
+              {{ render_field(form.optimogo_config.ambiguous_prefix) }}
+              {{ render_field(form.optimogo_config.search_min_term_length) }}
+              {{ render_field(form.optimogo_config.search_max_term_length) }}
+              {{ render_field(form.optimogo_config.search_limit) }}
+              {{ render_field(form.optimogo_config.verify_certificate) }}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+{% endblock %}

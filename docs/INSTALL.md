@@ -70,20 +70,23 @@ Optional keys (defaults in spec §3.3): `connect_timeout` (0.4), `read_timeout`
   name field. The handset caller-ID path is resolved pre-ring by the
   `callerid_forphones` AGI querying wazo-dird's reverse service.
 
-## Web admin UI (wazo-ui): menu vs. form
-Once the backend is enabled (above), `optimogo` **appears** in wazo-ui's
-"Add Directory Source" menu, because that menu is `GET /0.1/backends`.
+## Web admin UI (wazo-ui)
+This package also ships a **wazo-ui plugin** (`optimogo_source`), so the source is
+fully configurable from the web UI. `wazo/rules install` installs the wazo-ui
+conf.d drop-in (`enabled_plugins.optimogo_source: true`) and restarts `wazo-ui`.
 
-However, wazo-ui **cannot yet render a config form** for it: the per-backend forms
-and templates (`form_<backend>.html`, the `<backend>_config` form field) are
-hardcoded in wazo-ui for the 9 stock backends only — there is no `form_optimogo.html`.
-Clicking "Add → OptimoGo" in the UI will therefore error (TemplateNotFound).
+Once installed, **Directory → Sources → Add → OptimoGo** renders a form with a
+main tab (**Lookup URL**, **API key**) and an **Advanced** tab (timeouts, cache,
+breaker, ambiguous prefix, search bounds, TLS verification — pre-filled with the
+backend defaults). Submitting it creates the source through wazo-ui's generic
+dird path (`POST /0.1/backends/optimogo/sources`).
 
-Two ways forward:
-- **Provision via the dird REST API** (works today — §2), or
-- **Add a wazo-ui plugin** that ships an `OptimoGoForm` + `form_optimogo.html`
-  template so the source is fully manageable from the web UI (separate, optional
-  deliverable).
+You can still provision via the **dird REST API** (§2) instead if you prefer.
+
+Note: the **Verify TLS certificate** checkbox follows wazo-ui's standard boolean
+handling — to set it to *false* (emergency diagnostics only) use the dird API.
+
+Design: `docs/superpowers/specs/2026-06-16-wazo-ui-optimogo-source-form-design.md`.
 
 ## 4. Teardown order (uninstall / disconnect)
 1. **Unbind** `optimogo` from all profiles (reverse + lookup) first.

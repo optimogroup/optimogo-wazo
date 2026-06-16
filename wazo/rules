@@ -12,23 +12,30 @@
 # so PLUGIN_DIR is the parent of this wazo/ directory (where setup.py lives).
 PLUGIN_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-# wazo-dird only loads/lists backends that appear in enabled_plugins.backends, so
-# the plugin ships a conf.d drop-in that enables the optimogo backend. Without it
-# the backend is installed but invisible to dird's API and the wazo-ui menu.
-DIRD_CONFD := /etc/wazo-dird/conf.d
+# The package serves two services (they share the system Python):
+#   - wazo-dird: the source backend. dird only loads/lists backends present in
+#     enabled_plugins.backends, so we drop a conf.d to enable optimogo.
+#   - wazo-ui:   the admin form plugin. wazo-ui only loads plugins enabled in its
+#     own enabled_plugins, so we drop a conf.d to enable optimogo_source.
+# Without each drop-in the corresponding side is installed but inert.
 CONF := 50-wazo-dird-optimogo.yml
+DIRD_CONFD := /etc/wazo-dird/conf.d
+UI_CONFD := /etc/wazo-ui/conf.d
 
 .PHONY: install uninstall postrm
 
 install:
 	pip3 install --break-system-packages --no-deps --upgrade "$(PLUGIN_DIR)"
 	install -m 644 "$(PLUGIN_DIR)/etc/wazo-dird/conf.d/$(CONF)" "$(DIRD_CONFD)/$(CONF)"
+	install -m 644 "$(PLUGIN_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	systemctl restart wazo-dird
+	systemctl restart wazo-ui
 
 uninstall:
 	pip3 uninstall --yes wazo-dird-optimogo || true
-	rm -f "$(DIRD_CONFD)/$(CONF)"
+	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	systemctl restart wazo-dird
+	systemctl restart wazo-ui
 
 postrm:
-	rm -f "$(DIRD_CONFD)/$(CONF)"
+	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"

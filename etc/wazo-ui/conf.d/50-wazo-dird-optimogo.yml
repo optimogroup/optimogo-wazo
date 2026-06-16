@@ -1,0 +1,7 @@
+# Enable the optimogo_source wazo-ui plugin (shipped by wazo-dird-optimogo).
+#
+# This plugin adds the OptimoGo config form to wazo-ui's "Add Directory Source"
+# page. wazo-ui loads only plugins enabled here; xivo's ChainMap deep-merges this
+# drop-in, so every stock wazo-ui plugin stays enabled.
+enabled_plugins:
+  optimogo_source: true
