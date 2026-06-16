@@ -1133,14 +1133,17 @@ def make_engine(client, clock, **over):
 
 def test_reverse_match_then_cached(clock):
     client = FakeClient()
-    client.responses = [{'match': {'name': 'Acme', 'number': '+61399999999',
-                                   'customer_id': 1, 'match_state': 'matched'}}]
+    # Two differently-formatted numbers normalize to DIFFERENT cache keys
+    # ('+61399999999' keeps the '+', '0399999999' does not), so two HTTP calls
+    # happen -> prime two responses. The third call (same formatting as the
+    # first) is served from cache.
+    match = {'match': {'name': 'Acme', 'number': '+61399999999',
+                       'customer_id': 1, 'match_state': 'matched'}}
+    client.responses = [match, match]
     eng = make_engine(client, clock)
     first = eng.reverse('+61 3 9999 9999')
     assert first['display_name'] == 'Acme'
-    second = eng.reverse('0399999999')   # different formatting; NOTE separate key
-    # second normalizes differently -> second HTTP call would be needed, so prime it
-    # Re-querying the SAME formatting hits cache:
+    second = eng.reverse('0399999999')   # different formatting; separate key -> 2nd HTTP call
     client.responses = []                # no more responses available
     cached = eng.reverse('+61 3 9999 9999')
     assert cached == first
