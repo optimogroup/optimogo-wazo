@@ -24,5 +24,9 @@ setup(
         'wazo_ui.plugins': [
             'optimogo_source = wazo_dird_optimogo.ui.plugin:Plugin',
         ],
+        # wazo-auth IDP plugin: per-user SSO via OptimoGo introspection.
+        'wazo_auth.idp': [
+            'optimogo = wazo_auth_optimogo.idp:OptimoGoIDP',
+        ],
     },
 )

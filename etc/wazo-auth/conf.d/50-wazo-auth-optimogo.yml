@@ -1,0 +1,11 @@
+# Enable the OptimoGo wazo-auth IDP plugin (per-user SSO via OptimoGo introspection).
+# priority: 0 -> checked before stock ldap/saml so backend='optimogo' is never intercepted.
+idp_plugins:
+  optimogo:
+    enabled: true
+    priority: 0
+    optimogo_base_url: 'https://CHANGE-ME.optimogo.example'
+    tenant_schema: 'CHANGE-ME'
+    wazo_tenant_uuid: 'CHANGE-ME'
+    auth_bridge_key: 'CHANGE-ME'
+    verify_certificate: true

@@ -2,11 +2,14 @@ name: wazo-dird-optimogo
 namespace: optimo
 version: '1.0.0'
 plugin_format_version: 2
-display_name: OptimoGo dird lookup
+display_name: OptimoGo dird lookup + auth IDP
 description: >
   wazo-dird source backend that resolves caller IDs (reverse) and directory
-  searches (forward) against a tenant's OptimoGo JSON endpoint.
+  searches (forward) against a tenant's OptimoGo JSON endpoint, plus a
+  wazo-auth IDP plugin that authenticates Wazo users via per-user OptimoGo
+  SSO token introspection.
 author: Optimo Group
 license: proprietary
 debian_depends:
   - wazo-dird
+  - wazo-auth

@@ -19,6 +19,8 @@ PLUGIN_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 CONF := 50-wazo-dird-optimogo.yml
 DIRD_CONFD := /etc/wazo-dird/conf.d
 UI_CONFD := /etc/wazo-ui/conf.d
+AUTH_CONF := 50-wazo-auth-optimogo.yml
+AUTH_CONFD := /etc/wazo-auth/conf.d
 SRC_DIR := /usr/src/wazo-dird-optimogo
 
 .PHONY: build package install uninstall postrm
@@ -28,20 +30,25 @@ build:
 
 package:
 	mkdir -p "$(pkgdir)$(SRC_DIR)"
-	cp -a "$(PLUGIN_DIR)/setup.py" "$(PLUGIN_DIR)/wazo_dird_optimogo" "$(PLUGIN_DIR)/etc" "$(pkgdir)$(SRC_DIR)/"
+	cp -a "$(PLUGIN_DIR)/setup.py" "$(PLUGIN_DIR)/wazo_dird_optimogo" "$(PLUGIN_DIR)/wazo_auth_optimogo" "$(PLUGIN_DIR)/etc" "$(pkgdir)$(SRC_DIR)/"
 
 install:
 	pip3 install --break-system-packages --no-deps --upgrade "$(SRC_DIR)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-dird/conf.d/$(CONF)" "$(DIRD_CONFD)/$(CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
+	install -m 644 "$(SRC_DIR)/etc/wazo-auth/conf.d/$(AUTH_CONF)" "$(AUTH_CONFD)/$(AUTH_CONF)"
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
+	systemctl restart wazo-auth
 
 uninstall:
 	pip3 uninstall --break-system-packages --yes wazo-dird-optimogo || true
 	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
+	rm -f "$(AUTH_CONFD)/$(AUTH_CONF)"
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
+	systemctl restart wazo-auth
 
 postrm:
 	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
+	rm -f "$(AUTH_CONFD)/$(AUTH_CONF)"
