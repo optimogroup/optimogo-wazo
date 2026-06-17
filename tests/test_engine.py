@@ -138,5 +138,5 @@ def test_match_all_one_batch_call(clock):
     out = eng.match_all(['+61399999999', '+61400000000', 'anonymous'])
     assert set(out.keys()) == {'+61399999999'}        # unmatched + skipped omitted
     assert out['+61399999999']['name'] == 'Acme'
-    assert client.calls[0][0] == '/reverse/batch'
+    assert client.calls[0][0] == '/reverse/batch/'
     assert len(client.calls) == 1

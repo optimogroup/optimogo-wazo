@@ -19,7 +19,7 @@ def test_post_returns_parsed_json_and_sends_bearer():
     responses.add(responses.POST, f'{BASE}/reverse',
                   json={'match': None}, status=200,
                   content_type='application/json')
-    body = make_client().post('/reverse', {'number': '+61399999999'})
+    body = make_client().post('/reverse/', {'number': '+61399999999'})
     assert body == {'match': None}
     sent = responses.calls[0].request
     assert sent.headers['Authorization'] == 'Bearer secret-key'
@@ -32,7 +32,7 @@ def test_auth_errors(status):
     responses.add(responses.POST, f'{BASE}/reverse', status=status,
                   json={}, content_type='application/json')
     with pytest.raises(OptimoGoAuthError):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})
 
 
 @responses.activate
@@ -41,7 +41,7 @@ def test_unavailable_errors(status):
     responses.add(responses.POST, f'{BASE}/reverse', status=status,
                   json={}, content_type='application/json')
     with pytest.raises(OptimoGoUnavailable):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})
 
 
 @responses.activate
@@ -50,7 +50,7 @@ def test_other_4xx_is_lookup_error(status):
     responses.add(responses.POST, f'{BASE}/reverse', status=status,
                   json={}, content_type='application/json')
     with pytest.raises(OptimoGoLookupError):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})
 
 
 @responses.activate
@@ -58,7 +58,7 @@ def test_wrong_content_type_is_lookup_error():
     responses.add(responses.POST, f'{BASE}/reverse', body='hello',
                   status=200, content_type='text/plain')
     with pytest.raises(OptimoGoLookupError):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})
 
 
 @responses.activate
@@ -66,7 +66,7 @@ def test_malformed_json_is_lookup_error():
     responses.add(responses.POST, f'{BASE}/reverse', body='{not json',
                   status=200, content_type='application/json')
     with pytest.raises(OptimoGoLookupError):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})
 
 
 @responses.activate
@@ -75,4 +75,4 @@ def test_oversized_body_is_lookup_error():
     responses.add(responses.POST, f'{BASE}/reverse', body=big,
                   status=200, content_type='application/json')
     with pytest.raises(OptimoGoLookupError):
-        make_client().post('/reverse', {'number': '1'})
+        make_client().post('/reverse/', {'number': '1'})

@@ -37,7 +37,7 @@ class LookupEngine:
         hit, value = self._cache.get(key)
         if hit:
             return value
-        body = self._request('/reverse', {'number': number})
+        body = self._request('/reverse/', {'number': number})
         if body is _FAILED:
             return None
         match = body.get('match') if isinstance(body, dict) else None
@@ -56,7 +56,7 @@ class LookupEngine:
         hit, value = self._cache.get(key)
         if hit:
             return value
-        body = self._request('/search', {'term': clean, 'limit': self._cfg['search_limit']})
+        body = self._request('/search/', {'term': clean, 'limit': self._cfg['search_limit']})
         if body is _FAILED:
             return []
         rows = body.get('results') if isinstance(body, dict) else None
@@ -70,7 +70,7 @@ class LookupEngine:
         wanted = [n for n in numbers if not should_skip_number(n)]
         if not wanted:
             return {}
-        body = self._request('/reverse/batch', {'numbers': wanted})
+        body = self._request('/reverse/batch/', {'numbers': wanted})
         if body is _FAILED:
             return {}
         matches = body.get('matches') if isinstance(body, dict) else None
