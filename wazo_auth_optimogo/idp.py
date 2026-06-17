@@ -1,9 +1,9 @@
 import logging
 
-try:                                   # on the PBX these exist; off-box we stub for unit tests
-    from wazo_auth.plugins.idp.base import BaseIDP
-    from wazo_auth.exceptions import InvalidUsernamePassword as _InvalidUsernamePassword
-except ImportError:                    # pragma: no cover - exercised only off-box
+try:                                   # on the PBX these exist; real imports run ON-box only
+    from wazo_auth.plugins.idp.base import BaseIDP  # pragma: no cover
+    from wazo_auth.exceptions import InvalidUsernamePassword as _InvalidUsernamePassword  # pragma: no cover
+except ImportError:                    # off-box / unit-test path — stubs used here
     class BaseIDP:                     # minimal stand-in
         def load(self, dependencies): ...
 
@@ -17,6 +17,9 @@ from .exceptions import IntrospectError
 from .http_client import OptimoGoIntrospectClient
 
 logger = logging.getLogger(__name__)
+
+_BREAKER_FAILURE_THRESHOLD = 5
+_BREAKER_COOLDOWN_SECONDS = 30
 
 
 class InvalidBridgeToken(_InvalidUsernamePassword):
@@ -41,7 +44,10 @@ class OptimoGoIDP(BaseIDP):
             read_timeout=cfg['read_timeout'],
             verify=cfg['verify_certificate'],
         )
-        self._breaker = CircuitBreaker(failure_threshold=5, cooldown=30)
+        self._breaker = CircuitBreaker(
+            failure_threshold=_BREAKER_FAILURE_THRESHOLD,
+            cooldown=_BREAKER_COOLDOWN_SECONDS,
+        )
         self._backend = dependencies['backends']['wazo_user'].obj   # S2: confirmed injection key
         self._user_service = dependencies['user_service']           # S2: confirmed injection key
 
@@ -98,7 +104,8 @@ class OptimoGoIDP(BaseIDP):
         try:
             result = self._user_service.list_users(login=email)
             users = result['items'] if isinstance(result, dict) else result
-        except Exception:
+        except Exception as e:
+            logger.warning('optimogo: user resolution failed for %s: %s', email, e)
             return None
 
         matches = [
