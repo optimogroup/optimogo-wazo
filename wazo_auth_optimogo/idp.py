@@ -31,6 +31,7 @@ class OptimoGoIDP(BaseIDP):
     # OptimoGo SSO must be set to authentication_method='optimogo' via wazo-auth's
     # IDP user-association API; they lose Wazo password login (like SAML/LDAP).
     authentication_method = 'optimogo'
+    loaded = False
 
     def load(self, dependencies):
         super().load(dependencies)
@@ -52,6 +53,10 @@ class OptimoGoIDP(BaseIDP):
         )
         self._backend = dependencies['backends']['wazo_user'].obj   # S2: confirmed injection key
         self._user_service = dependencies['user_service']           # S2: confirmed injection key
+        # wazo-auth's controller checks this flag after load(); without it the
+        # plugin is treated as "not loaded" and its authentication_method is
+        # dropped (mirrors stock NativeIDP, which sets loaded=True here).
+        self.loaded = True
 
     def can_authenticate(self, args: dict) -> bool:
         return (

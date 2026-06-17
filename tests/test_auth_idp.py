@@ -36,6 +36,36 @@ def _idp(client, *, resolve_ok=True, breaker=None):
 
 
 # ---------------------------------------------------------------------------
+# load
+# ---------------------------------------------------------------------------
+
+def test_load_marks_plugin_loaded():
+    """load() must set self.loaded=True. wazo-auth's controller checks this flag
+    after load(); without it the plugin is treated as not-loaded and its
+    authentication_method is dropped (so it never reaches the auth-method list).
+    Mirrors stock NativeIDP."""
+    class _Ext:
+        obj = _FakeBackend()
+
+    deps = {
+        'config': {'idp_plugins': {'optimogo': {
+            'optimogo_base_url': 'https://og.example.com',
+            'tenant_schema': 'acme',
+            'wazo_tenant_uuid': 't-uuid',
+            'auth_bridge_key': 'secret',
+        }}},
+        'backends': {'wazo_user': _Ext()},
+        'user_service': object(),
+    }
+    idp = OptimoGoIDP()
+    assert idp.loaded is False                       # default before load
+    idp.load(deps)
+    assert idp.loaded is True
+    assert idp._backend is deps['backends']['wazo_user'].obj
+    assert idp._wazo_tenant_uuid == 't-uuid'
+
+
+# ---------------------------------------------------------------------------
 # can_authenticate
 # ---------------------------------------------------------------------------
 
