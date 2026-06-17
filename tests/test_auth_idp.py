@@ -166,3 +166,38 @@ def test_invalid_bridge_token_is_invalid_username_password():
 def test_authentication_method_is_optimogo():
     idp = OptimoGoIDP()
     assert idp.authentication_method == 'optimogo'
+
+
+# ---------------------------------------------------------------------------
+# _resolve_enabled_user — missing email guard
+# ---------------------------------------------------------------------------
+
+class _FakeUserService:
+    """Stand-in for user_service; raises if called — the guard must fire first."""
+
+    def list_users(self, login=None):
+        raise AssertionError('_user_service.list_users should not be called for a missing email')
+
+
+def test_resolve_enabled_user_returns_none_for_missing_email():
+    """Guard: None/empty email returns None without touching user_service."""
+    idp = OptimoGoIDP()
+    idp._user_service = _FakeUserService()
+
+    assert idp._resolve_enabled_user(None, 't-uuid') is None
+    assert idp._resolve_enabled_user('', 't-uuid') is None
+
+
+def test_verify_auth_missing_email_raises_invalid_bridge_token_not_attribute_error():
+    """verify_auth with no email in introspection result must raise InvalidBridgeToken,
+    NOT AttributeError — the guard in _resolve_enabled_user must fire first."""
+    idp = OptimoGoIDP()
+    idp._client = _FakeClient({'active': True, 'wazo_tenant_uuid': 't-uuid'})  # no 'email' key
+    idp._backend = _FakeBackend()
+    idp._wazo_tenant_uuid = 't-uuid'
+    idp._user_service = _FakeUserService()
+    from wazo_dird_optimogo.breaker import CircuitBreaker
+    idp._breaker = CircuitBreaker(failure_threshold=5, cooldown=30)
+
+    with pytest.raises(InvalidBridgeToken):
+        idp.verify_auth({'backend': 'optimogo', 'login': 'a@b.com', 'password': 'tok'})

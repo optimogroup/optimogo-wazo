@@ -44,6 +44,8 @@ class OptimoGoIDP(BaseIDP):
             read_timeout=cfg['read_timeout'],
             verify=cfg['verify_certificate'],
         )
+        # Fail-closed: an OPEN breaker REJECTS the login — we never admit a
+        # user on an unverifiable token.
         self._breaker = CircuitBreaker(
             failure_threshold=_BREAKER_FAILURE_THRESHOLD,
             cooldown=_BREAKER_COOLDOWN_SECONDS,
@@ -70,7 +72,7 @@ class OptimoGoIDP(BaseIDP):
             raise InvalidBridgeToken(args.get('login'))
 
         try:
-            result = self._client.introspect(args['password'])
+            result = self._client.introspect(args.get('password'))
             self._breaker.record_success()
         except IntrospectError as e:
             self._breaker.record_failure()
@@ -101,6 +103,9 @@ class OptimoGoIDP(BaseIDP):
         list_users return shape: dict with 'items' key (wazo-auth 26.x) or bare list
         — both are handled by the isinstance check below.
         """
+        if not email:
+            return None
+
         try:
             result = self._user_service.list_users(login=email)
             users = result['items'] if isinstance(result, dict) else result
