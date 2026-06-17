@@ -4,7 +4,6 @@ from .exceptions import (
     IntrospectAuthError, IntrospectTimeout, IntrospectUnavailable, IntrospectError,
 )
 
-_MAX_BODY_BYTES = 1 << 16  # 64 KiB — introspect responses are tiny
 _PATH = '/introspect'
 
 
@@ -71,6 +70,3 @@ class OptimoGoIntrospectClient:
         if not isinstance(data, dict) or 'active' not in data:
             raise IntrospectError('malformed introspection response: missing "active" key')
         return data
-
-    def close(self):
-        self._session.close()
