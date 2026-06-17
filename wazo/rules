@@ -1,38 +1,44 @@
 #!/usr/bin/make -f
 # wazo-plugind install rules for optimo/wazo-dird-optimogo (plugin_format_version 2).
 #
-# Invoked by the generated debian maintainer scripts (confirmed against
-# wazo-plugind 26.04 templates) as:
-#   rules install     -> postinst   (configure): install package + enable backend + reload dird
-#   rules uninstall    -> prerm      (remove):    remove package + drop config + reload dird
-#   rules postrm       -> postrm     (purge/remove): final cleanup
+# wazo-plugind (26.04) drives this file as debian/rules. During the package build
+# it runs (see wazo_plugind/tasks.py _PackageBuilder):
+#   rules build                  -> compile step (nothing to build: pure Python)
+#   rules package  (env pkgdir)  -> stage the .deb payload under $(pkgdir)
+# and the generated maintainer scripts run, at (un)install time:
+#   rules install   -> postinst (configure): pip-install the carried source + enable + reload
+#   rules uninstall -> prerm    (remove):    pip-uninstall + drop config + reload
+#   rules postrm    -> postrm   (purge):     final config cleanup
 #
-# wazo-plugind installs the whole plugin tree under
-#   /usr/lib/wazo-plugind/plugins/optimo/wazo-dird-optimogo/
-# so PLUGIN_DIR is the parent of this wazo/ directory (where setup.py lives).
+# plugind only copies the wazo/ metadata dir into the package, so `package`
+# carries the actual plugin source into the .deb (under /usr/src) and the postinst
+# `install` pip-installs it — mirroring the validated manual
+# `pip3 install --break-system-packages --no-deps .`.
 PLUGIN_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-# The package serves two services (they share the system Python):
-#   - wazo-dird: the source backend. dird only loads/lists backends present in
-#     enabled_plugins.backends, so we drop a conf.d to enable optimogo.
-#   - wazo-ui:   the admin form plugin. wazo-ui only loads plugins enabled in its
-#     own enabled_plugins, so we drop a conf.d to enable optimogo_source.
-# Without each drop-in the corresponding side is installed but inert.
 CONF := 50-wazo-dird-optimogo.yml
 DIRD_CONFD := /etc/wazo-dird/conf.d
 UI_CONFD := /etc/wazo-ui/conf.d
+SRC_DIR := /usr/src/wazo-dird-optimogo
 
-.PHONY: install uninstall postrm
+.PHONY: build package install uninstall postrm
+
+build:
+	@:
+
+package:
+	mkdir -p "$(pkgdir)$(SRC_DIR)"
+	cp -a "$(PLUGIN_DIR)/setup.py" "$(PLUGIN_DIR)/wazo_dird_optimogo" "$(PLUGIN_DIR)/etc" "$(pkgdir)$(SRC_DIR)/"
 
 install:
-	pip3 install --break-system-packages --no-deps --upgrade "$(PLUGIN_DIR)"
-	install -m 644 "$(PLUGIN_DIR)/etc/wazo-dird/conf.d/$(CONF)" "$(DIRD_CONFD)/$(CONF)"
-	install -m 644 "$(PLUGIN_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
+	pip3 install --break-system-packages --no-deps --upgrade "$(SRC_DIR)"
+	install -m 644 "$(SRC_DIR)/etc/wazo-dird/conf.d/$(CONF)" "$(DIRD_CONFD)/$(CONF)"
+	install -m 644 "$(SRC_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
 
 uninstall:
-	pip3 uninstall --yes wazo-dird-optimogo || true
+	pip3 uninstall --break-system-packages --yes wazo-dird-optimogo || true
 	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
