@@ -4,7 +4,11 @@ from .exceptions import (
     IntrospectAuthError, IntrospectTimeout, IntrospectUnavailable, IntrospectError,
 )
 
-_PATH = '/introspect'
+# Trailing slash is REQUIRED: OptimoGo's Django introspect route is slash-terminated
+# (`…/introspect/`) with APPEND_SLASH=True. Django cannot 301-redirect a POST to the
+# slashed URL without dropping the body (and we send allow_redirects=False), so posting
+# to `/introspect` raises a 500 (RuntimeError: APPEND_SLASH ... can't redirect POST).
+_PATH = '/introspect/'
 
 
 class OptimoGoIntrospectClient:

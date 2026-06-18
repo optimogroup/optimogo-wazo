@@ -137,7 +137,9 @@ def test_bearer_token_set_in_headers():
 
 
 def test_introspect_posts_to_correct_url():
-    """introspect() POSTs to <base_url>/introspect."""
+    """introspect() POSTs to <base_url>/introspect/ — the trailing slash is required
+    because OptimoGo's Django route is slash-terminated with APPEND_SLASH=True, which
+    cannot redirect a POST to the slashed URL without dropping the body."""
     calls = []
 
     class _RecordingSession:
@@ -152,7 +154,7 @@ def test_introspect_posts_to_correct_url():
         base_url='https://og.example.com/api/wazo/auth/acme', api_key='k',
         connect_timeout=2, read_timeout=4, verify=True, session=_RecordingSession())
     c.introspect('tok')
-    assert calls == ['https://og.example.com/api/wazo/auth/acme/introspect']
+    assert calls == ['https://og.example.com/api/wazo/auth/acme/introspect/']
 
 
 def test_introspect_sends_token_in_body():
