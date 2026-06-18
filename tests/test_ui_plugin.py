@@ -6,6 +6,7 @@ import flask  # noqa: E402
 
 from wazo_dird_optimogo.ui.plugin import Plugin  # noqa: E402
 from wazo_ui.plugins.dird_source.form import DirdSourceForm  # noqa: E402
+from wazo_ui.plugins.identity.form import IdentityForm  # noqa: E402
 
 
 @pytest.mark.needs_ui
@@ -38,3 +39,31 @@ def test_load_is_idempotent():
     app2 = flask.Flask(__name__)
     Plugin().load({'flask': app2})
     assert hasattr(DirdSourceForm, 'optimogo_config')
+
+
+@pytest.mark.needs_ui
+def test_load_adds_optimogo_authentication_method():
+    app = flask.Flask(__name__)
+    app.config['WTF_CSRF_ENABLED'] = False
+    app.secret_key = 'test'
+
+    Plugin().load({'flask': app})
+
+    choices = IdentityForm.authentication_method.kwargs['choices']
+    values = [value for value, _label in choices]
+    # added, exactly once, with the expected label
+    assert ('optimogo', 'OptimoGo') in choices
+    assert values.count('optimogo') == 1
+    # stock choices preserved (additive, not replaced)
+    for stock in ('default', 'native', 'saml', 'ldap'):
+        assert stock in values
+
+
+@pytest.mark.needs_ui
+def test_load_optimogo_authentication_method_is_idempotent():
+    # Loading twice (e.g. across worker reloads) must not duplicate the choice.
+    Plugin().load({'flask': flask.Flask(__name__)})
+    Plugin().load({'flask': flask.Flask(__name__)})
+
+    values = [value for value, _label in IdentityForm.authentication_method.kwargs['choices']]
+    assert values.count('optimogo') == 1
