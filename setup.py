@@ -12,6 +12,11 @@ setup(
         'wazo_dird_optimogo.ui': ['templates/dird_source/form/*.html'],
     },
     entry_points={
+        # wazo-calld plugin: swap ami.record_start for a dual-channel (stereo)
+        # recorder. See wazo_calld_optimogo/plugin.py.
+        'wazo_calld.plugins': [
+            'optimogo_stereo_record = wazo_calld_optimogo.plugin:Plugin',
+        ],
         # wazo-dird source backend: the lookup logic (server side).
         'wazo_dird.backends': [
             'optimogo = wazo_dird_optimogo.plugin:OptimoGoSourcePlugin',
