@@ -7,16 +7,21 @@ from wazo_calld_optimogo import record
 
 
 MONITOR = '/var/lib/wazo/sounds/tenants/t-uuid/monitor/rec-uuid.wav'
-RX = '/var/lib/wazo/sounds/tenants/t-uuid/monitor/rec-uuid.rx.wav'
-TX = '/var/lib/wazo/sounds/tenants/t-uuid/monitor/rec-uuid.tx.wav'
+RX = f'{record.FEED_TMP_DIR}/rec-uuid.rx.wav'
+TX = f'{record.FEED_TMP_DIR}/rec-uuid.tx.wav'
 
 
-def test_feed_paths_derives_rx_tx_from_wav():
-    assert record.feed_paths(MONITOR) == (RX, TX)
+def test_feed_paths_are_outside_the_monitor_dir():
+    rx, tx = record.feed_paths(MONITOR)
+    assert (rx, tx) == (RX, TX)
+    # The recordings (monitor) directory must never hold the feeds.
+    assert '/monitor/' not in rx and '/monitor/' not in tx
 
 
-def test_feed_paths_without_wav_suffix():
-    assert record.feed_paths('/tmp/rec') == ('/tmp/rec.rx.wav', '/tmp/rec.tx.wav')
+def test_feed_paths_key_on_basename_uuid():
+    rx, tx = record.feed_paths('/any/dir/abc123.wav')
+    assert rx == f'{record.FEED_TMP_DIR}/abc123.rx.wav'
+    assert tx == f'{record.FEED_TMP_DIR}/abc123.tx.wav'
 
 
 def test_build_destination_records_both_directions():

@@ -22,6 +22,7 @@ The signature mirrors the vendor function exactly so it can be monkeypatched in
 from __future__ import annotations
 
 import logging
+import os
 
 from requests import RequestException
 
@@ -32,15 +33,28 @@ logger = logging.getLogger(__name__)
 PYTHON_BIN = '/usr/bin/python3'
 MERGE_MODULE = 'wazo_calld_optimogo.stereo_merge'
 
+# Per-direction feeds are written OUTSIDE the tenant monitor/ directory so that dir
+# only ever contains the single registered <uuid>.wav — call-logd registers only the
+# main file (via its MixMonitorStart CEL), but keeping the recordings dir clean of
+# transient/failed feeds protects any disk-based consumer, backup, or retention scan.
+# Must be writable by the asterisk process (MixMonitor writes the feeds); created by
+# the plugin's install rules as asterisk:asterisk.
+FEED_TMP_DIR = '/var/spool/asterisk/stereo-record-tmp'
+
 _WAV_SUFFIX = '.wav'
 _RX_SUFFIX = '.rx.wav'
 _TX_SUFFIX = '.tx.wav'
 
 
 def feed_paths(filename: str) -> tuple[str, str]:
-    """Return (rx_path, tx_path) derived from the main recording filename."""
-    base = filename[: -len(_WAV_SUFFIX)] if filename.endswith(_WAV_SUFFIX) else filename
-    return base + _RX_SUFFIX, base + _TX_SUFFIX
+    """Return (rx_path, tx_path) in the feed temp dir, keyed to the recording uuid."""
+    stem = os.path.basename(filename)
+    if stem.endswith(_WAV_SUFFIX):
+        stem = stem[: -len(_WAV_SUFFIX)]
+    return (
+        os.path.join(FEED_TMP_DIR, stem + _RX_SUFFIX),
+        os.path.join(FEED_TMP_DIR, stem + _TX_SUFFIX),
+    )
 
 
 def build_destination(channel: str, filename: str, options: str | None = None) -> dict:

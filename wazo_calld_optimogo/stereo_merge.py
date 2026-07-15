@@ -14,7 +14,12 @@ built in :mod:`wazo_calld_optimogo.record`)::
 Safety contract: the caller has already written a mono mix to ``out.wav``. If
 anything here fails (a feed missing/empty, ``sox`` error, unreadable file) we log
 it and leave that mono file in place — a recording is never destroyed. The rx/tx
-feeds are removed only after a successful merge (kept otherwise, for debugging).
+feeds are always removed (success or failure) so nothing lingers on disk; on
+failure the ``sox`` stderr is logged instead of keeping the feeds around.
+
+The scratch file for the merge is a hidden, non-``.wav`` sibling of ``out.wav`` in
+the same directory (same filesystem, so the final swap is a true atomic rename) —
+never a second ``.wav`` that a directory scanner could mistake for a recording.
 """
 
 from __future__ import annotations
@@ -29,7 +34,14 @@ logger = logging.getLogger('wazo_calld_optimogo.stereo_merge')
 SOX_BIN = '/usr/bin/sox'
 SOX_TIMEOUT_SECONDS = 120
 _LOG_PATH = '/var/log/asterisk/wazo-optimogo-stereo-merge.log'
-_TMP_SUFFIX = '.stereo.tmp.wav'
+# Hidden, non-.wav scratch name so a `*.wav` scan of the recordings dir never sees it.
+_TMP_PREFIX = '.'
+_TMP_SUFFIX = '.stereo.tmp'
+
+
+def _tmp_path(out_path: str) -> str:
+    directory, name = os.path.split(out_path)
+    return os.path.join(directory, _TMP_PREFIX + name + _TMP_SUFFIX)
 
 
 def _safe_remove(path: str) -> None:
@@ -52,69 +64,69 @@ def merge(out_path: str, rx_path: str, tx_path: str) -> bool:
     Returns True if ``out_path`` was replaced with the 2-channel file, False if the
     existing (mono) ``out_path`` was left untouched.
     """
-    for feed in (rx_path, tx_path):
-        if not _feed_ready(feed):
-            logger.warning(
-                'stereo merge skipped: feed missing or empty (%s); keeping mono %s',
-                feed,
+    tmp_path = _tmp_path(out_path)
+    try:
+        for feed in (rx_path, tx_path):
+            if not _feed_ready(feed):
+                logger.warning(
+                    'stereo merge skipped: feed missing or empty (%s); keeping mono %s',
+                    feed,
+                    out_path,
+                )
+                return False
+
+        # Force the classic WAVE_FORMAT_PCM header (`wavpcm`, 16-bit signed) rather
+        # than sox's default WAVE_FORMAT_EXTENSIBLE for multichannel — the latter is
+        # valid but trips stricter WAV parsers (incl. Python's `wave` and some
+        # browsers). This matches the stock mono recording so playback is unchanged.
+        command = [
+            SOX_BIN,
+            '-M',
+            rx_path,
+            tx_path,
+            '-t',
+            'wavpcm',
+            '-e',
+            'signed-integer',
+            '-b',
+            '16',
+            tmp_path,
+        ]
+        try:
+            subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                timeout=SOX_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError:
+            logger.error('stereo merge failed: sox not found at %s', SOX_BIN)
+            return False
+        except subprocess.TimeoutExpired:
+            logger.error('stereo merge failed: sox timed out for %s', out_path)
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                'stereo merge failed: sox exited %s for %s: %s',
+                e.returncode,
                 out_path,
+                (e.stderr or b'').decode('utf-8', 'replace').strip(),
             )
             return False
 
-    tmp_path = out_path + _TMP_SUFFIX
-    # Force the classic WAVE_FORMAT_PCM header (`wavpcm`, 16-bit signed) rather than
-    # sox's default WAVE_FORMAT_EXTENSIBLE for multichannel — the latter is valid
-    # but trips stricter WAV parsers (incl. Python's `wave` and some browsers). This
-    # matches the stock mono recording format so playback/download is unchanged.
-    command = [
-        SOX_BIN,
-        '-M',
-        rx_path,
-        tx_path,
-        '-t',
-        'wavpcm',
-        '-e',
-        'signed-integer',
-        '-b',
-        '16',
-        tmp_path,
-    ]
-    try:
-        subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            timeout=SOX_TIMEOUT_SECONDS,
-        )
-    except FileNotFoundError:
-        logger.error('stereo merge failed: sox not found at %s', SOX_BIN)
-        _safe_remove(tmp_path)
-        return False
-    except subprocess.TimeoutExpired:
-        logger.error('stereo merge failed: sox timed out for %s', out_path)
-        _safe_remove(tmp_path)
-        return False
-    except subprocess.CalledProcessError as e:
-        logger.error(
-            'stereo merge failed: sox exited %s for %s: %s',
-            e.returncode,
-            out_path,
-            (e.stderr or b'').decode('utf-8', 'replace').strip(),
-        )
-        _safe_remove(tmp_path)
-        return False
+        try:
+            os.replace(tmp_path, out_path)  # atomic within the same filesystem
+        except OSError as e:
+            logger.error('stereo merge failed: could not replace %s: %s', out_path, e)
+            return False
 
-    try:
-        os.replace(tmp_path, out_path)  # atomic within the same filesystem
-    except OSError as e:
-        logger.error('stereo merge failed: could not replace %s: %s', out_path, e)
+        logger.info('stereo merge ok: %s', out_path)
+        return True
+    finally:
+        # Never leave scratch or feed files behind, whatever happened above.
         _safe_remove(tmp_path)
-        return False
-
-    _safe_remove(rx_path)
-    _safe_remove(tx_path)
-    logger.info('stereo merge ok: %s', out_path)
-    return True
+        _safe_remove(rx_path)
+        _safe_remove(tx_path)
 
 
 def _setup_logging() -> None:

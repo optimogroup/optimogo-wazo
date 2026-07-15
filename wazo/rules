@@ -40,6 +40,7 @@ install:
 	install -m 644 "$(SRC_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-auth/conf.d/$(AUTH_CONF)" "$(AUTH_CONFD)/$(AUTH_CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-calld/conf.d/$(CALLD_CONF)" "$(CALLD_CONFD)/$(CALLD_CONF)"
+	install -d -o asterisk -g asterisk -m 750 /var/spool/asterisk/stereo-record-tmp
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
 	systemctl restart wazo-auth

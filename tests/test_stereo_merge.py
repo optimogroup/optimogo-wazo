@@ -8,6 +8,7 @@ valid 2-channel file it must leave the pre-written mono file untouched (a
 recording is never destroyed).
 """
 
+import os
 import shutil
 import struct
 import subprocess
@@ -41,7 +42,7 @@ def test_merge_missing_feed_keeps_mono(tmp_path):
     assert _channels(out) == 1  # untouched
 
 
-def test_merge_empty_feed_keeps_mono(tmp_path):
+def test_merge_empty_feed_keeps_mono_and_cleans_feeds(tmp_path):
     out = tmp_path / 'rec.wav'
     _write_wav(out, [1, 2, 3])
     rx = tmp_path / 'rec.rx.wav'
@@ -51,9 +52,11 @@ def test_merge_empty_feed_keeps_mono(tmp_path):
 
     assert stereo_merge.merge(str(out), str(rx), str(tx)) is False
     assert _channels(out) == 1
+    # even a lone/partial feed is cleaned up so nothing lingers on disk
+    assert not rx.exists() and not tx.exists()
 
 
-def test_merge_sox_failure_keeps_mono_and_cleans_tmp(tmp_path, monkeypatch):
+def test_merge_sox_failure_keeps_mono_and_cleans_everything(tmp_path, monkeypatch):
     out = tmp_path / 'rec.wav'
     _write_wav(out, [1, 2, 3])
     rx = tmp_path / 'rec.rx.wav'
@@ -68,8 +71,16 @@ def test_merge_sox_failure_keeps_mono_and_cleans_tmp(tmp_path, monkeypatch):
 
     assert stereo_merge.merge(str(out), str(rx), str(tx)) is False
     assert _channels(out) == 1  # mono preserved
-    assert not (tmp_path / ('rec.wav' + stereo_merge._TMP_SUFFIX)).exists()
-    assert rx.exists() and tx.exists()  # feeds kept for debugging on failure
+    assert not os.path.exists(stereo_merge._tmp_path(str(out)))  # scratch cleaned
+    assert not rx.exists() and not tx.exists()  # feeds cleaned even on failure
+
+
+def test_tmp_path_is_hidden_and_not_a_wav(tmp_path):
+    out = tmp_path / 'rec.wav'
+    tmp = stereo_merge._tmp_path(str(out))
+    assert os.path.basename(tmp).startswith('.')  # hidden
+    assert not tmp.endswith('.wav')  # a *.wav scan won't pick it up
+    assert os.path.dirname(tmp) == os.path.dirname(str(out))  # same fs for atomic swap
 
 
 def test_merge_sox_missing_binary_keeps_mono(tmp_path, monkeypatch):
