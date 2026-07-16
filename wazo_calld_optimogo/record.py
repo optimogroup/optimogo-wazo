@@ -74,6 +74,18 @@ def build_destination(channel: str, filename: str, options: str | None = None) -
     }
 
 
+def build_app_args(filename: str) -> str:
+    """Build the ``MixMonitor`` *application* argument string (``file,options,command``).
+
+    Used by the wazo-agid path, which starts recording via ``agi.appexec('MixMonitor',
+    ...)`` rather than the AMI action. Same feeds + merge command as the calld path.
+    """
+    rx_path, tx_path = feed_paths(filename)
+    options = f'r({rx_path})t({tx_path})'
+    command = f'{PYTHON_BIN} -m {MERGE_MODULE} {filename} {rx_path} {tx_path}'
+    return f'{filename},{options},{command}'
+
+
 def record_start(amid, channel, filename, options=None):
     """Drop-in replacement for ``ami.record_start`` producing a stereo recording."""
     destination = build_destination(channel, filename, options)

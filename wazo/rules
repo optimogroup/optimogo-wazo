@@ -23,6 +23,10 @@ AUTH_CONF := 50-wazo-auth-optimogo.yml
 AUTH_CONFD := /etc/wazo-auth/conf.d
 CALLD_CONF := 50-wazo-calld-optimogo.yml
 CALLD_CONFD := /etc/wazo-calld/conf.d
+# wazo-agid has no entry-point loader — it imports every .py in its modules dir. The
+# stereo-recording shim is installed straight into that dir (see agid_modules/).
+AGID_SHIM := optimogo_stereo_record.py
+AGID_MODULES := /usr/lib/python3/dist-packages/wazo_agid/modules
 SRC_DIR := /usr/src/wazo-dird-optimogo
 
 .PHONY: build package install uninstall postrm
@@ -32,7 +36,7 @@ build:
 
 package:
 	mkdir -p "$(pkgdir)$(SRC_DIR)"
-	cp -a "$(PLUGIN_DIR)/setup.py" "$(PLUGIN_DIR)/wazo_dird_optimogo" "$(PLUGIN_DIR)/wazo_auth_optimogo" "$(PLUGIN_DIR)/wazo_calld_optimogo" "$(PLUGIN_DIR)/etc" "$(pkgdir)$(SRC_DIR)/"
+	cp -a "$(PLUGIN_DIR)/setup.py" "$(PLUGIN_DIR)/wazo_dird_optimogo" "$(PLUGIN_DIR)/wazo_auth_optimogo" "$(PLUGIN_DIR)/wazo_calld_optimogo" "$(PLUGIN_DIR)/agid_modules" "$(PLUGIN_DIR)/etc" "$(pkgdir)$(SRC_DIR)/"
 
 install:
 	pip3 install --break-system-packages --no-deps --upgrade "$(SRC_DIR)"
@@ -45,22 +49,27 @@ install:
 	[ -f "$(AUTH_CONFD)/$(AUTH_CONF)" ] || install -m 644 "$(SRC_DIR)/etc/wazo-auth/conf.d/$(AUTH_CONF)" "$(AUTH_CONFD)/$(AUTH_CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-calld/conf.d/$(CALLD_CONF)" "$(CALLD_CONFD)/$(CALLD_CONF)"
 	install -d -o asterisk -g asterisk -m 750 /var/spool/asterisk/stereo-record-tmp
+	install -m 644 "$(SRC_DIR)/agid_modules/$(AGID_SHIM)" "$(AGID_MODULES)/$(AGID_SHIM)"
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
 	systemctl restart wazo-auth
 	systemctl restart wazo-calld
+	systemctl restart wazo-agid
 
 uninstall:
 	pip3 uninstall --break-system-packages --yes wazo-dird-optimogo || true
 	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	rm -f "$(AUTH_CONFD)/$(AUTH_CONF)"
 	rm -f "$(CALLD_CONFD)/$(CALLD_CONF)"
+	rm -f "$(AGID_MODULES)/$(AGID_SHIM)" "$(AGID_MODULES)/__pycache__/optimogo_stereo_record."*.pyc
 	systemctl restart wazo-dird
 	systemctl restart wazo-ui
 	systemctl restart wazo-auth
 	systemctl restart wazo-calld
+	systemctl restart wazo-agid
 
 postrm:
 	rm -f "$(DIRD_CONFD)/$(CONF)" "$(UI_CONFD)/$(CONF)"
 	rm -f "$(AUTH_CONFD)/$(AUTH_CONF)"
 	rm -f "$(CALLD_CONFD)/$(CALLD_CONF)"
+	rm -f "$(AGID_MODULES)/$(AGID_SHIM)" "$(AGID_MODULES)/__pycache__/optimogo_stereo_record."*.pyc

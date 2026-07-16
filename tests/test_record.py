@@ -44,6 +44,18 @@ def test_build_destination_preserves_existing_options():
     assert dest['options'] == f'br({RX})t({TX})'
 
 
+def test_build_app_args_is_file_options_command():
+    args = record.build_app_args(MONITOR)
+    # agid uses the application form: File,options,command
+    assert args == (
+        f'{MONITOR},r({RX})t({TX}),'
+        f'{record.PYTHON_BIN} -m {record.MERGE_MODULE} {MONITOR} {RX} {TX}'
+    )
+    # the app-arg feeds and the AMI-action feeds must be identical
+    dest = record.build_destination('chan', MONITOR)
+    assert dest['options'] in args and dest['Command'] in args
+
+
 class _FakeAmid:
     def __init__(self):
         self.actions = []
