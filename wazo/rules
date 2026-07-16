@@ -38,7 +38,11 @@ install:
 	pip3 install --break-system-packages --no-deps --upgrade "$(SRC_DIR)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-dird/conf.d/$(CONF)" "$(DIRD_CONFD)/$(CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-ui/conf.d/$(CONF)" "$(UI_CONFD)/$(CONF)"
-	install -m 644 "$(SRC_DIR)/etc/wazo-auth/conf.d/$(AUTH_CONF)" "$(AUTH_CONFD)/$(AUTH_CONF)"
+	# The auth conf.d holds env-specific SECRETS (optimogo_base_url, tenant_schema,
+	# auth_bridge_key). The repo ships only CHANGE-ME placeholders, so a reinstall
+	# must NOT overwrite a real config an admin already filled in — install the
+	# placeholder only when the file is absent (fresh install).
+	[ -f "$(AUTH_CONFD)/$(AUTH_CONF)" ] || install -m 644 "$(SRC_DIR)/etc/wazo-auth/conf.d/$(AUTH_CONF)" "$(AUTH_CONFD)/$(AUTH_CONF)"
 	install -m 644 "$(SRC_DIR)/etc/wazo-calld/conf.d/$(CALLD_CONF)" "$(CALLD_CONFD)/$(CALLD_CONF)"
 	install -d -o asterisk -g asterisk -m 750 /var/spool/asterisk/stereo-record-tmp
 	systemctl restart wazo-dird
