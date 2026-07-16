@@ -1,17 +1,25 @@
 from xivo.mallow import fields
-from xivo.mallow.validate import Length, Range
+from xivo.mallow.validate import Length, Range, validate_string_dict
 from xivo.mallow_helpers import ListSchema as _ListSchema
 
 from wazo_dird.schemas import BaseSourceSchema, VerifyCertificateField
+
+from ..schema import (
+    DEFAULT_FIRST_MATCHED_COLUMNS,
+    DEFAULT_FORMAT_COLUMNS,
+    DEFAULT_SEARCHED_COLUMNS,
+)
 
 
 class SourceSchema(BaseSourceSchema):
     """Validates an optimogo source config posted to the dird HTTP API.
 
     BaseSourceSchema supplies the standard fields (name, uuid, tenant_uuid,
-    first_matched_columns, searched_columns, format_columns). This adds the
-    optimogo-specific config; defaults mirror the backend's own config schema so
-    a minimal create (name + lookup_url + api_key) yields a complete source.
+    first_matched_columns, searched_columns, format_columns), but defaults those
+    three column fields to EMPTY. We override them with the same defaults as the
+    backend's own config schema so a minimal create (name + lookup_url + api_key)
+    yields a complete source — in particular a `reverse` format column, without
+    which caller-ID reverse lookups resolve the match but display no name.
     """
 
     lookup_url = fields.URL(required=True)
@@ -28,6 +36,19 @@ class SourceSchema(BaseSourceSchema):
     search_max_term_length = fields.Integer(validate=Range(min=1), load_default=64)
     search_limit = fields.Integer(validate=Range(min=1, max=200), load_default=25)
     verify_certificate = VerifyCertificateField(load_default=True)
+    # Override BaseSourceSchema's empty defaults for these three (see docstring).
+    first_matched_columns = fields.List(
+        fields.String(validate=Length(min=1, max=128)),
+        load_default=lambda: list(DEFAULT_FIRST_MATCHED_COLUMNS),
+    )
+    searched_columns = fields.List(
+        fields.String(validate=Length(min=1, max=128)),
+        load_default=lambda: list(DEFAULT_SEARCHED_COLUMNS),
+    )
+    format_columns = fields.Dict(
+        validate=validate_string_dict,
+        load_default=lambda: dict(DEFAULT_FORMAT_COLUMNS),
+    )
 
 
 class ListSchema(_ListSchema):

@@ -21,6 +21,17 @@ def test_minimal_config_gets_defaults(valid_config):
     assert cfg['unique_column'] == 'id'
     assert cfg['first_matched_columns'] == ['number']
     assert cfg['searched_columns'] == ['name', 'number']
+    # A `reverse` format column is required or caller-ID resolves the match but
+    # shows no name; `name` keeps forward display consistent (regression guard).
+    assert cfg['format_columns'] == {
+        'name': '{display_name}',
+        'reverse': '{display_name}',
+    }
+
+
+def test_explicit_format_columns_override_defaults(valid_config):
+    cfg = load_config(dict(valid_config, format_columns={'reverse': '{name}'}))
+    assert cfg['format_columns'] == {'reverse': '{name}'}
 
 
 def test_missing_required_fields_raise():

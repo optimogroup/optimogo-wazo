@@ -42,3 +42,11 @@ def test_source_schema_applies_backend_defaults():
     assert loaded['search_max_term_length'] == 64
     assert loaded['search_limit'] == 25
     assert loaded['verify_certificate'] is True
+    # The create path (this view schema) must also populate the column configs —
+    # a minimal create previously stored these empty, so caller-ID showed no name.
+    assert loaded['first_matched_columns'] == ['number']
+    assert loaded['searched_columns'] == ['name', 'number']
+    assert loaded['format_columns'] == {
+        'name': '{display_name}',
+        'reverse': '{display_name}',
+    }

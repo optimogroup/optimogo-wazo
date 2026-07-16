@@ -1,5 +1,15 @@
 from marshmallow import Schema, fields, validate, EXCLUDE
 
+# Column defaults shared with the HTTP view schema (dird_view/schemas.py) so a
+# minimal source (name + lookup_url + api_key) is complete on both paths.
+DEFAULT_FIRST_MATCHED_COLUMNS = ['number']
+DEFAULT_SEARCHED_COLUMNS = ['name', 'number']
+# wazo-dird derives the reverse (caller-ID) display and the forward name from the
+# source's `reverse` / `name` format columns. Without a `reverse` column the
+# caller-ID lookup resolves the match but returns an empty display (no name on the
+# phone). `{display_name}` carries the ambiguous "Maybe: " prefix from mapping.py.
+DEFAULT_FORMAT_COLUMNS = {'name': '{display_name}', 'reverse': '{display_name}'}
+
 
 class _ConfigSchema(Schema):
     class Meta:
@@ -20,9 +30,13 @@ class _ConfigSchema(Schema):
     search_max_term_length = fields.Integer(load_default=64, validate=validate.Range(min=1))
     search_limit = fields.Integer(load_default=25, validate=validate.Range(min=1, max=200))
     verify_certificate = fields.Raw(load_default=True)
-    first_matched_columns = fields.List(fields.String(), load_default=lambda: ['number'])
-    searched_columns = fields.List(fields.String(), load_default=lambda: ['name', 'number'])
-    format_columns = fields.Dict(load_default=dict)
+    first_matched_columns = fields.List(
+        fields.String(), load_default=lambda: list(DEFAULT_FIRST_MATCHED_COLUMNS)
+    )
+    searched_columns = fields.List(
+        fields.String(), load_default=lambda: list(DEFAULT_SEARCHED_COLUMNS)
+    )
+    format_columns = fields.Dict(load_default=lambda: dict(DEFAULT_FORMAT_COLUMNS))
     unique_column = fields.String(load_default='id')
 
 
