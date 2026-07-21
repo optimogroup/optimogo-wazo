@@ -3,3 +3,8 @@ marshmallow>=3.13,<4
 pytest>=7
 responses>=0.23
 jinja2>=3.0
+# wazo-phoned's HTTP stack: needed to exercise the XSI plugin's real URL routing
+# (which resource a phone's request actually lands on) rather than only its
+# pure logic.
+flask>=2
+flask-restful>=0.3.9

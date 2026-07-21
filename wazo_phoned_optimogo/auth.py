@@ -48,6 +48,18 @@ class SipCredential(NamedTuple):
     password: str
 
 
+class ResolvedUser(NamedTuple):
+    """The Wazo user a validated phone credential belongs to.
+
+    The tenant travels with the uuid because it is needed to scope tenant-wide
+    lookups (the global voicemail boxes a user may read); resolving it a second
+    time from the uuid alone would cost another confd round trip per request.
+    """
+
+    uuid: str
+    tenant_uuid: str
+
+
 def _b64decode(value: str, field: str) -> str:
     try:
         return base64.b64decode(value, validate=True).decode('utf-8')
@@ -94,8 +106,8 @@ def _auth_options(endpoint: dict) -> dict[str, str]:
     return {key: value for key, value in endpoint.get('auth_section_options') or []}
 
 
-def resolve_user_uuid(confd_client, credential: SipCredential) -> str:
-    """Validate the SIP credential against confd and return the user UUID.
+def resolve_user(confd_client, credential: SipCredential) -> ResolvedUser:
+    """Validate the SIP credential against confd and return the user it belongs to.
 
     Looks the endpoint up by its auth username, checks the password matches the
     stored one, then follows the endpoint's line to its user.
@@ -127,7 +139,9 @@ def resolve_user_uuid(confd_client, credential: SipCredential) -> str:
     user = next(iter(line_detail.get('users') or []), None)
     if not user or not user.get('uuid'):
         raise UserResolutionError('line is not associated with a user')
-    return user['uuid']
+    # The user summary on a line carries no tenant, but a user always lives in
+    # the same tenant as the endpoint its line points at.
+    return ResolvedUser(uuid=user['uuid'], tenant_uuid=endpoint['tenant_uuid'])
 
 
 def _passwords_equal(stored: str, presented: str) -> bool:

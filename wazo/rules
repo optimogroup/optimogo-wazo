@@ -24,14 +24,22 @@ AUTH_CONFD := /etc/wazo-auth/conf.d
 CALLD_CONF := 50-wazo-calld-optimogo.yml
 CALLD_CONFD := /etc/wazo-calld/conf.d
 # wazo-phoned plugin: serves Wazo call history to Yealink phones' Network CallLog
-# over BroadWorks XSI. NOTE: the plugin reads confd endpoints/lines and call-logd
-# CDRs using wazo-phoned's own service token, whose stock policy does NOT grant
-# that. An admin must create a wazo-auth policy with:
+# and Wazo voicemail to their visual-voicemail screen, over BroadWorks XSI.
+# NOTE: the plugin reads confd endpoints/lines/voicemails, call-logd CDRs and
+# calld voicemail messages using wazo-phoned's own service token, whose stock
+# policy does NOT grant that. An admin must create a wazo-auth policy with:
 #     confd.endpoints.sip.read, confd.endpoints.sip.*.read,
-#     confd.lines.*.read, call-logd.users.*.cdr.read
+#     confd.lines.*.read, call-logd.users.*.cdr.read,
+#     confd.voicemails.read, confd.users.*.voicemails.read,
+#     calld.voicemails.*.read,
+#     calld.voicemails.*.messages.*.read,
+#     calld.voicemails.*.messages.*.recording.read,
+#     calld.voicemails.*.messages.*.update,
+#     calld.voicemails.*.messages.*.delete
 # and associate it with the `wazo-phoned` user. That is deliberately NOT scripted
 # here: creating a policy needs administrator credentials we must not embed.
-# Without it the XSI endpoint authenticates but returns empty call logs.
+# Without it the XSI endpoints authenticate but return empty call logs and an
+# empty message list.
 PHONED_CONF := 50-wazo-phoned-optimogo.yml
 PHONED_CONFD := /etc/wazo-phoned/conf.d
 # wazo-agid has no entry-point loader — it imports every .py in its modules dir. The

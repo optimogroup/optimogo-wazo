@@ -1,23 +1,27 @@
 name: wazo-dird-optimogo
 namespace: optimo
-version: '1.1.0'
+version: '1.2.0'
 plugin_format_version: 2
-display_name: OptimoGo dird lookup + auth IDP + stereo recording + XSI call log
+display_name: OptimoGo dird lookup + auth IDP + stereo recording + XSI call log and voicemail
 description: >
   wazo-dird source backend that resolves caller IDs (reverse) and directory
   searches (forward) against a tenant's OptimoGo JSON endpoint, a wazo-auth IDP
   plugin that authenticates Wazo users via per-user OptimoGo SSO token
   introspection, a wazo-calld plugin that records calls as dual-channel
   (stereo) audio with each party on a separate channel, and a wazo-phoned plugin
-  that serves Wazo call history to Yealink phones' "Network CallLog" over the
-  BroadWorks XSI interface (backed by wazo-call-logd), so a desk phone shows the
-  user's real placed/received/missed calls instead of only its own local list.
+  that serves Yealink phones over the BroadWorks XSI interface: their "Network
+  CallLog" from wazo-call-logd, so a desk phone shows the user's real
+  placed/received/missed calls instead of only its own local list, and their
+  visual voicemail from wazo-calld, so the voicemail key opens a real message
+  list — play, mark read/unread, delete — instead of dialling the audio IVR.
 
-  NOTE: the XSI call-log plugin reads confd endpoints/lines and call-logd CDRs
-  using wazo-phoned's service token. Its stock policy does not permit that, so an
-  administrator must grant a wazo-auth policy with confd.endpoints.sip.read,
-  confd.endpoints.sip.*.read, confd.lines.*.read and call-logd.users.*.cdr.read
-  to the wazo-phoned user. See wazo/rules.
+  NOTE: the XSI plugin reads confd endpoints/lines/voicemails, call-logd CDRs and
+  calld voicemail messages using wazo-phoned's service token. Its stock policy
+  does not permit that, so an administrator must grant a wazo-auth policy with
+  confd.endpoints.sip.read, confd.endpoints.sip.*.read, confd.lines.*.read,
+  confd.voicemails.read, confd.users.*.voicemails.read,
+  call-logd.users.*.cdr.read and calld.voicemails.* to the wazo-phoned user.
+  See wazo/rules.
 author: Optimo Group
 license: proprietary
 debian_depends:

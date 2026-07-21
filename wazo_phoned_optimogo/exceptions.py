@@ -42,3 +42,22 @@ class UserResolutionError(XsiError):
     e.g. a trunk endpoint, or a line with no user attached — there is no call
     log to return. Maps to 401 for the same phone-side reason as above.
     """
+
+
+class MessageKeyError(XsiError):
+    """A voicemail message id in the URL is not one we published.
+
+    The phone echoes back the ``<messageId>`` we gave it, so a key we cannot
+    parse is a stale or forged request rather than a credential problem. Maps to
+    404 — unlike the auth errors above, re-authenticating would not help.
+    """
+
+
+class VoicemailFolderError(XsiError):
+    """A voicemail is missing the folder a read/unread change needs.
+
+    Wazo stores "read" as membership of the ``old`` folder, so a box without the
+    target folder cannot express the change. Maps to 503: the request was valid,
+    the server just cannot carry it out, and the phone should not conclude the
+    message is gone.
+    """

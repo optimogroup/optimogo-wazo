@@ -68,10 +68,10 @@ def test_parse_basic_without_colon_raises():
         auth.parse_broadworks_sip(header)
 
 
-# --- resolve_user_uuid ----------------------------------------------------
+# --- resolve_user ----------------------------------------------------
 
 class FakeConfd:
-    """Minimal confd stand-in exposing only what resolve_user_uuid touches."""
+    """Minimal confd stand-in exposing only what resolve_user touches."""
 
     def __init__(self, endpoint=None, line=None):
         self._endpoint = endpoint
@@ -99,10 +99,14 @@ class FakeConfd:
             return self._line
 
 
+TENANT = '02b639ea-a2d2-4314-ab30-cc7c1e490fbe'
+
+
 def _endpoint(username='cuejqnsy', password='slevcxeb', line_id=1):
     return {
         'uuid': 'ep-uuid',
         'name': username,
+        'tenant_uuid': TENANT,
         'auth_section_options': [['username', username], ['password', password]],
         'line': {'id': line_id} if line_id else None,
     }
@@ -112,35 +116,39 @@ def _line(user_uuid=USER):
     return {'id': 1, 'users': [{'uuid': user_uuid}] if user_uuid else []}
 
 
-def test_resolve_returns_user_uuid_on_valid_credential():
+def test_resolve_returns_user_and_tenant_on_valid_credential():
     confd = FakeConfd(endpoint=_endpoint(), line=_line())
     cred = SipCredential(sip_user='cuejqnsy', password='slevcxeb')
-    assert auth.resolve_user_uuid(confd, cred) == USER
+    resolved = auth.resolve_user(confd, cred)
+    assert resolved.uuid == USER
+    # The tenant comes off the endpoint, not the (tenant-less) user summary the
+    # line returns — the voicemail lookup needs it to scope global mailboxes.
+    assert resolved.tenant_uuid == TENANT
 
 
 def test_resolve_unknown_endpoint_raises_authentication_error():
     confd = FakeConfd(endpoint=None)
     cred = SipCredential(sip_user='nobody', password='x')
     with pytest.raises(AuthenticationError):
-        auth.resolve_user_uuid(confd, cred)
+        auth.resolve_user(confd, cred)
 
 
 def test_resolve_wrong_password_raises_authentication_error():
     confd = FakeConfd(endpoint=_endpoint(password='correct'), line=_line())
     cred = SipCredential(sip_user='cuejqnsy', password='WRONG')
     with pytest.raises(AuthenticationError):
-        auth.resolve_user_uuid(confd, cred)
+        auth.resolve_user(confd, cred)
 
 
 def test_resolve_endpoint_without_line_raises_user_resolution_error():
     confd = FakeConfd(endpoint=_endpoint(line_id=None))
     cred = SipCredential(sip_user='cuejqnsy', password='slevcxeb')
     with pytest.raises(UserResolutionError):
-        auth.resolve_user_uuid(confd, cred)
+        auth.resolve_user(confd, cred)
 
 
 def test_resolve_line_without_user_raises_user_resolution_error():
     confd = FakeConfd(endpoint=_endpoint(), line=_line(user_uuid=None))
     cred = SipCredential(sip_user='cuejqnsy', password='slevcxeb')
     with pytest.raises(UserResolutionError):
-        auth.resolve_user_uuid(confd, cred)
+        auth.resolve_user(confd, cred)
