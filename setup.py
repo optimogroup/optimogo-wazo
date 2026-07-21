@@ -33,5 +33,10 @@ setup(
         'wazo_auth.idp': [
             'optimogo = wazo_auth_optimogo.idp:OptimoGoIDP',
         ],
+        # wazo-phoned plugin: serve Wazo call history to Yealink phones' Network
+        # CallLog over BroadWorks XSI (see wazo_phoned_optimogo/plugin.py).
+        'wazo_phoned.plugins': [
+            'optimogo_xsi_calllog = wazo_phoned_optimogo.plugin:Plugin',
+        ],
     },
 )

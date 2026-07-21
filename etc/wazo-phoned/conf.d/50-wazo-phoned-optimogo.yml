@@ -1,0 +1,13 @@
+# Enable the OptimoGo XSI call-log plugin on wazo-phoned.
+#
+# It serves Wazo call history to Yealink phones' "Network CallLog" over the
+# BroadWorks XSI path (/com.broadsoft.xsi-actions/...), backed by wazo-call-logd.
+# phoned ships no call-logd client, so we add one here; xivo's config ChainMap
+# deep-merges this into enabled_plugins, leaving the stock vendor plugins on.
+call_logd:
+  host: localhost
+  port: 9298
+  prefix: null
+  https: false
+enabled_plugins:
+  optimogo_xsi_calllog: true
