@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='wazo-dird-optimogo',
-    version='1.0.0',
+    version='1.2.0',
     description='wazo-dird source backend that resolves caller IDs against OptimoGo',
     author='Optimo Group',
     packages=find_packages(exclude=['tests', 'tests.*']),
