@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import logging
 
+import requests
 from flask import Response, request
 from flask_restful import Resource
 
-from . import auth, call_logs, voicemail, xml
+from . import auth, call_logs, queues, voicemail, xml
 from .exceptions import MessageKeyError, VoicemailFolderError, XsiError
 
 logger = logging.getLogger(__name__)
@@ -71,14 +72,57 @@ class _BaseCallLogsResource(_BaseXsiResource):
         super().__init__(confd_client)
         self.call_logd_client = call_logd_client
 
-    def _load_buckets(self, user_uuid: str) -> dict:
+    def _fetch_feed(self, user_uuid: str) -> list[dict]:
         # recurse=True is required, not optional: phoned's service token lives in
         # the master tenant while users and their CDRs live in a sub-tenant, so a
         # non-recursive query returns an empty list for every real user.
         result = self.call_logd_client.cdr.list_for_user(
             user_uuid, limit=_CDR_LIMIT, recurse=True
         )
-        return call_logs.split_call_logs(result.get('items') or [], user_uuid)
+        return result.get('items') or []
+
+    def _load_buckets(self, user_uuid: str) -> dict:
+        """Build the three call-log lists for a user.
+
+        Placed and Received are always personal — the user's own CDR feed. Missed
+        is personal too *unless* the user is a queue member, in which case it
+        becomes the shared reception list: an inbound call nobody on the queue
+        answered shows on every member's phone, because call-logd tags each such
+        CDR to only one member and would otherwise hide it from the rest.
+        """
+        own_feed = self._fetch_feed(user_uuid)
+        buckets = call_logs.split_call_logs(own_feed, user_uuid)
+
+        comembers = self._reception_comembers(user_uuid)
+        if comembers:
+            feeds = [own_feed]
+            feeds += [
+                self._fetch_feed(uuid) for uuid in sorted(comembers) if uuid != user_uuid
+            ]
+            buckets[call_logs.MISSED] = call_logs.shared_missed_entries(
+                feeds, limit=_CDR_LIMIT
+            )
+        return buckets
+
+    def _reception_comembers(self, user_uuid: str) -> set:
+        """Queue co-members of the user, or an empty set to keep the personal list.
+
+        A missing ``confd.queues.read`` grant surfaces as an HTTP error from confd
+        rather than a crash: we log the remediation once and fall back to the
+        personal Missed list, so the feature degrades to its previous behaviour
+        instead of failing the whole call-log screen.
+        """
+        try:
+            return queues.comember_uuids(self.confd_client, user_uuid)
+        except requests.RequestException as exc:
+            logger.warning(
+                'queue lookup failed for %s (%s); serving the personal Missed '
+                'list. Grant wazo-phoned confd.queues.read to enable the shared '
+                'reception Missed list.',
+                user_uuid,
+                exc,
+            )
+            return set()
 
 
 class CallLogsResource(_BaseCallLogsResource):

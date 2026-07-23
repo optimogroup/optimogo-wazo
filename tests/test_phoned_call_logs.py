@@ -144,3 +144,49 @@ def test_split_returns_all_three_lists_even_when_empty():
     buckets = call_logs.split_call_logs([], USER)
     assert set(buckets) == {PLACED, RECEIVED, MISSED}
     assert all(v == [] for v in buckets.values())
+
+
+# --- shared reception missed ----------------------------------------------
+
+def test_is_shared_missed_only_for_inbound_unanswered():
+    assert call_logs.is_shared_missed(_cdr(call_direction='inbound', answered=False))
+    assert not call_logs.is_shared_missed(_cdr(call_direction='inbound', answered=True))
+    assert not call_logs.is_shared_missed(_cdr(call_direction='outbound', answered=False))
+    assert not call_logs.is_shared_missed(_cdr(answered=False))  # no direction
+
+
+def test_shared_missed_unions_and_dedupes_across_feeds():
+    jay = [_cdr(id=10, call_direction='inbound', answered=False,
+                start='2026-07-23T09:10:00.000000+10:00')]
+    pat = [_cdr(id=20, call_direction='inbound', answered=False,
+                start='2026-07-23T09:20:00.000000+10:00'),
+           _cdr(id=10, call_direction='inbound', answered=False,  # same call, other feed
+                start='2026-07-23T09:10:00.000000+10:00')]
+    entries = call_logs.shared_missed_entries([jay, pat], limit=50)
+    assert [e.log_id for e in entries] == ['20', '10']  # newest first, deduped
+
+
+def test_shared_missed_drops_answered_and_outbound():
+    feed = [
+        _cdr(id=1, call_direction='inbound', answered=False),   # keep
+        _cdr(id=2, call_direction='inbound', answered=True),    # colleague caught it
+        _cdr(id=3, call_direction='outbound', answered=False),  # placed
+    ]
+    entries = call_logs.shared_missed_entries([feed], limit=50)
+    assert [e.log_id for e in entries] == ['1']
+
+
+def test_shared_missed_shows_the_caller_as_the_party():
+    feed = [_cdr(id=1, call_direction='inbound', answered=False,
+                 source_extension='0417599373', source_name='Lindsay Devlin')]
+    (entry,) = call_logs.shared_missed_entries([feed], limit=50)
+    assert entry.number == '0417599373'
+    assert entry.name == 'Lindsay Devlin'
+
+
+def test_shared_missed_is_capped_to_the_limit():
+    feed = [_cdr(id=i, call_direction='inbound', answered=False,
+                 start=f'2026-07-23T09:{i:02d}:00.000000+10:00') for i in range(1, 11)]
+    entries = call_logs.shared_missed_entries([feed], limit=3)
+    assert len(entries) == 3
+    assert [e.log_id for e in entries] == ['10', '9', '8']  # newest three

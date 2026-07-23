@@ -32,6 +32,12 @@ RECEIVED = 'received'
 MISSED = 'missed'
 LISTS = (PLACED, RECEIVED, MISSED)
 
+# call_direction value for a call that came from outside the PBX. The shared
+# reception Missed list is built only from inbound calls: an internal colleague
+# who rang your extension and got no answer is your own affair, not something to
+# broadcast to everyone else on the reception queue.
+INBOUND = 'inbound'
+
 
 class CallLogEntry(NamedTuple):
     """One XSI ``callLogsEntry`` row (already in phone-facing form)."""
@@ -129,3 +135,35 @@ def split_call_logs(cdrs: list[dict], user_uuid: str) -> dict[str, list[CallLogE
             continue
         buckets[kind].append(to_entry(cdr, kind))
     return buckets
+
+
+def is_shared_missed(cdr: dict) -> bool:
+    """True if a CDR is an inbound call that nobody answered.
+
+    This is the whole definition of a shared reception miss: it rang the queue
+    and no agent picked up (``answered`` is false for the call as a whole, so a
+    call a colleague *did* catch is excluded — it is handled, not missed).
+    """
+    return cdr.get('call_direction') == INBOUND and not cdr.get('answered')
+
+
+def shared_missed_entries(
+    member_feeds: list[list[dict]], limit: int
+) -> list[CallLogEntry]:
+    """Build the shared Missed list from several queue members' CDR feeds.
+
+    call-logd tags each unanswered queue call to a single member, so no single
+    member's feed holds them all; we union every member's inbound-unanswered CDRs
+    and de-duplicate by CDR id (the id is global, so the same call seen through
+    two feeds collapses to one). The result is ordered newest-first and capped so
+    a busy reception cannot produce an unbounded XML document.
+    """
+    by_id: dict = {}
+    for feed in member_feeds:
+        for cdr in feed:
+            if is_shared_missed(cdr):
+                by_id[cdr.get('id')] = cdr
+    ordered = sorted(
+        by_id.values(), key=lambda cdr: cdr.get('start') or '', reverse=True
+    )
+    return [to_entry(cdr, MISSED) for cdr in ordered[:limit]]

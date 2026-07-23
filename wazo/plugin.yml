@@ -1,6 +1,6 @@
 name: wazo-dird-optimogo
 namespace: optimo
-version: '1.2.0'
+version: '1.3.0'
 plugin_format_version: 2
 display_name: OptimoGo dird lookup + auth IDP + stereo recording + XSI call log and voicemail
 description: >
@@ -13,15 +13,19 @@ description: >
   CallLog" from wazo-call-logd, so a desk phone shows the user's real
   placed/received/missed calls instead of only its own local list, and their
   visual voicemail from wazo-calld, so the voicemail key opens a real message
-  list — play, mark read/unread, delete — instead of dialling the audio IVR.
+  list — play, mark read/unread, delete — instead of dialling the audio IVR. On
+  a phone whose user is a queue member the Network CallLog "Missed" list is the
+  SHARED reception list: an inbound call nobody on the queue answered shows on
+  every member's phone (call-logd tags each such call to only one member).
 
-  NOTE: the XSI plugin reads confd endpoints/lines/voicemails, call-logd CDRs and
-  calld voicemail messages using wazo-phoned's service token. Its stock policy
-  does not permit that, so an administrator must grant a wazo-auth policy with
-  confd.endpoints.sip.read, confd.endpoints.sip.*.read, confd.lines.*.read,
-  confd.voicemails.read, confd.users.*.voicemails.read,
-  call-logd.users.*.cdr.read and calld.voicemails.* to the wazo-phoned user.
-  See wazo/rules.
+  NOTE: the XSI plugin reads confd endpoints/lines/queues/voicemails, call-logd
+  CDRs and calld voicemail messages using wazo-phoned's service token. Its stock
+  policy does not permit that, so an administrator must grant a wazo-auth policy
+  with confd.endpoints.sip.read, confd.endpoints.sip.*.read, confd.lines.*.read,
+  confd.queues.read, confd.queues.*.read, confd.voicemails.read,
+  confd.users.*.voicemails.read, call-logd.users.*.cdr.read and calld.voicemails.*
+  to the wazo-phoned user. Without confd.queues.read the Missed list falls back to
+  per-phone personal misses. See wazo/rules.
 author: Optimo Group
 license: proprietary
 debian_depends:

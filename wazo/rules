@@ -30,6 +30,7 @@ CALLD_CONFD := /etc/wazo-calld/conf.d
 # policy does NOT grant that. An admin must create a wazo-auth policy with:
 #     confd.endpoints.sip.read, confd.endpoints.sip.*.read,
 #     confd.lines.*.read, call-logd.users.*.cdr.read,
+#     confd.queues.read, confd.queues.*.read,
 #     confd.voicemails.read, confd.users.*.voicemails.read,
 #     calld.voicemails.*.read,
 #     calld.voicemails.*.messages.*.read,
@@ -38,8 +39,11 @@ CALLD_CONFD := /etc/wazo-calld/conf.d
 #     calld.voicemails.*.messages.*.delete
 # and associate it with the `wazo-phoned` user. That is deliberately NOT scripted
 # here: creating a policy needs administrator credentials we must not embed.
-# Without it the XSI endpoints authenticate but return empty call logs and an
-# empty message list.
+# The confd.queues.read pair powers the SHARED reception Missed list (a queue call
+# nobody answered shows on every member's phone); without it the plugin logs a
+# warning and each phone falls back to its own personal Missed list. Without the
+# rest the XSI endpoints authenticate but return empty call logs and an empty
+# message list.
 PHONED_CONF := 50-wazo-phoned-optimogo.yml
 PHONED_CONFD := /etc/wazo-phoned/conf.d
 # wazo-agid has no entry-point loader — it imports every .py in its modules dir. The

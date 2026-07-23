@@ -17,6 +17,7 @@ rather than constants.
 import base64
 
 import pytest
+import requests
 from flask import Flask
 from flask_restful import Api
 
@@ -63,13 +64,39 @@ def _message(message_id, timestamp, name='Jayden Smith', number='0488168739'):
 class FakeConfd:
     """wazo-confd stand-in: endpoint/line lookup plus voicemail associations."""
 
-    def __init__(self, global_voicemail_ids=(SHARED_VOICEMAIL_ID,), personal=None):
+    def __init__(
+        self, global_voicemail_ids=(SHARED_VOICEMAIL_ID,), personal=None, queues=()
+    ):
         self._global_ids = list(global_voicemail_ids)
         self._personal = personal
         self.endpoints_sip = self._Endpoints()
         self.lines = self._Lines()
         self.voicemails = self._Voicemails(self._global_ids)
         self.global_list_tenants = self.voicemails.tenants
+        self.queues = self._Queues(list(queues))
+
+    class _Queues:
+        """Stand-in for confd's queues resource (list summaries + detail).
+
+        Summaries omit the members relation, exactly as confd's list does, so the
+        membership code is forced through the detail fetch it does in production.
+        """
+
+        def __init__(self, queues):
+            self._queues = queues
+            self.listed = 0
+            self.fetched = []
+
+        def list(self, recurse):
+            self.listed += 1
+            return {'items': [{'id': q['id']} for q in self._queues]}
+
+        def get(self, queue_id):
+            self.fetched.append(queue_id)
+            for queue in self._queues:
+                if queue['id'] == queue_id:
+                    return queue
+            raise KeyError(queue_id)
 
     class _Endpoints:
         def list(self, name, recurse):
@@ -167,11 +194,19 @@ def _boxes(new=None, old=None):
 
 
 class FakeCallLogd:
-    class _Cdr:
-        def list_for_user(self, user_uuid, limit, recurse):
-            return {'items': []}
+    """Serves a per-user CDR feed, defaulting to empty for any unknown user."""
 
-    cdr = _Cdr()
+    def __init__(self, feeds=None):
+        self.cdr = self._Cdr(feeds or {})
+
+    class _Cdr:
+        def __init__(self, feeds):
+            self._feeds = feeds
+            self.requested = []
+
+        def list_for_user(self, user_uuid, limit, recurse):
+            self.requested.append(user_uuid)
+            return {'items': list(self._feeds.get(user_uuid, []))}
 
 
 @pytest.fixture
@@ -179,7 +214,7 @@ def services():
     return {'confd': FakeConfd(), 'calld': FakeCalld()}
 
 
-def _client(services):
+def _client(services, call_logd=None):
     """A test client wired to the plugin's real URL map over the given fakes."""
     app = Flask(__name__)
     api = Api(app)
@@ -187,7 +222,7 @@ def _client(services):
         api,
         call_log_kwargs={
             'confd_client': services['confd'],
-            'call_logd_client': FakeCallLogd(),
+            'call_logd_client': call_logd or FakeCallLogd(),
         },
         voicemail_kwargs={
             'confd_client': services['confd'],
@@ -245,6 +280,134 @@ def test_two_segment_route_reaches_the_per_message_mark(client, services):
 def test_call_log_routes_still_resolve_alongside_the_voicemail_ones(client):
     assert client.get(XSI + '/directories/CallLogs/', headers=_auth_header()).status_code == 200
     assert client.get(XSI + '/directories/CallLogs/Missed', headers=_auth_header()).status_code == 200
+
+
+# --- shared reception Missed list ------------------------------------------
+
+PAT_UUID = '09c94a95-9584-474e-a836-d86a9d0d5f7c'
+MISSED_URL = XSI + '/directories/CallLogs/Missed'
+PLACED_URL = XSI + '/directories/CallLogs/Placed'
+
+OFFICE_QUEUE = {
+    'id': 1,
+    'name': 'office',
+    'members': {'users': [{'uuid': USER_UUID}, {'uuid': PAT_UUID}]},
+}
+
+
+def _cdr(cdr_id, *, direction='inbound', answered=False, source='0400000000',
+         source_name='', src_user=None, dst_user=None, start=None):
+    return {
+        'id': cdr_id,
+        'call_direction': direction,
+        'answered': answered,
+        'source_extension': source,
+        'source_name': source_name,
+        'source_user_uuid': src_user,
+        'destination_user_uuid': dst_user,
+        'requested_user_uuid': None,
+        'destination_extension': '1099',
+        'destination_name': 'Reception',
+        'start': start or f'2026-07-23T09:{cdr_id:02d}:00.000000+10:00',
+    }
+
+
+def _missed_ids(response):
+    import re
+    return re.findall(r'<callLogId>(\d+)</callLogId>', response.data.decode())
+
+
+def test_queue_member_missed_unions_comember_feeds():
+    # A queue call nobody answered lands in only one member's feed; the shared
+    # Missed list must still show it on the other member's phone.
+    feeds = FakeCallLogd({
+        USER_UUID: [_cdr(10, dst_user=USER_UUID, start='2026-07-23T09:10:00.000000+10:00')],
+        PAT_UUID: [_cdr(20, dst_user=PAT_UUID, start='2026-07-23T09:20:00.000000+10:00')],
+    })
+    services = {'confd': FakeConfd(queues=[OFFICE_QUEUE]), 'calld': FakeCalld()}
+    client = _client(services, call_logd=feeds)
+
+    response = client.get(MISSED_URL, headers=_auth_header())
+
+    assert response.status_code == 200
+    # Newest first, both members' misses present.
+    assert _missed_ids(response) == ['20', '10']
+    # Both members' feeds were consulted.
+    assert set(feeds.cdr.requested) == {USER_UUID, PAT_UUID}
+
+
+def test_shared_missed_excludes_answered_and_outbound():
+    feeds = FakeCallLogd({
+        USER_UUID: [
+            _cdr(10, dst_user=USER_UUID),                       # missed  -> in
+            _cdr(11, answered=True, dst_user=USER_UUID),        # a colleague caught it -> out
+            _cdr(12, direction='outbound', src_user=USER_UUID),  # placed -> out of Missed
+        ],
+        PAT_UUID: [],
+    })
+    services = {'confd': FakeConfd(queues=[OFFICE_QUEUE]), 'calld': FakeCalld()}
+    client = _client(services, call_logd=feeds)
+
+    assert _missed_ids(client.get(MISSED_URL, headers=_auth_header())) == ['10']
+
+
+def test_same_call_seen_in_two_feeds_is_not_duplicated():
+    shared = _cdr(30, dst_user=USER_UUID)
+    feeds = FakeCallLogd({USER_UUID: [shared], PAT_UUID: [dict(shared)]})
+    services = {'confd': FakeConfd(queues=[OFFICE_QUEUE]), 'calld': FakeCalld()}
+    client = _client(services, call_logd=feeds)
+
+    assert _missed_ids(client.get(MISSED_URL, headers=_auth_header())) == ['30']
+
+
+def test_non_queue_member_keeps_personal_missed_only():
+    # No queue: the user's Missed is their own feed, and a co-worker's feed is
+    # never even fetched.
+    feeds = FakeCallLogd({
+        USER_UUID: [_cdr(10, dst_user=USER_UUID)],
+        PAT_UUID: [_cdr(20, dst_user=PAT_UUID)],
+    })
+    services = {'confd': FakeConfd(queues=[]), 'calld': FakeCalld()}
+    client = _client(services, call_logd=feeds)
+
+    assert _missed_ids(client.get(MISSED_URL, headers=_auth_header())) == ['10']
+    assert feeds.cdr.requested == [USER_UUID]
+
+
+def test_missing_queue_acl_falls_back_to_personal_missed():
+    class Forbidden(FakeConfd):
+        class _Queues(FakeConfd._Queues):
+            def list(self, recurse):
+                raise requests.HTTPError('403 confd.queues.read')
+
+        def __init__(self):
+            super().__init__(queues=[OFFICE_QUEUE])
+            self.queues = self._Queues([OFFICE_QUEUE])
+
+    feeds = FakeCallLogd({
+        USER_UUID: [_cdr(10, dst_user=USER_UUID)],
+        PAT_UUID: [_cdr(20, dst_user=PAT_UUID)],
+    })
+    client = _client({'confd': Forbidden(), 'calld': FakeCalld()}, call_logd=feeds)
+
+    # Degrades to the personal list rather than 500-ing the screen.
+    assert _missed_ids(client.get(MISSED_URL, headers=_auth_header())) == ['10']
+    assert feeds.cdr.requested == [USER_UUID]
+
+
+def test_queue_member_placed_stays_personal():
+    feeds = FakeCallLogd({
+        USER_UUID: [_cdr(10, direction='outbound', src_user=USER_UUID)],
+        PAT_UUID: [_cdr(20, direction='outbound', src_user=PAT_UUID)],
+    })
+    services = {'confd': FakeConfd(queues=[OFFICE_QUEUE]), 'calld': FakeCalld()}
+    client = _client(services, call_logd=feeds)
+
+    # Placed is the caller's own — Pat's placed call must not appear on it.
+    import re
+    ids = re.findall(r'<callLogId>(\d+)</callLogId>',
+                     client.get(PLACED_URL, headers=_auth_header()).data.decode())
+    assert ids == ['10']
 
 
 # --- authentication --------------------------------------------------------
